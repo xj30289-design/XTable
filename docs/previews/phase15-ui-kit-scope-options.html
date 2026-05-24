@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phase 1.5 UI Kit Scope Options</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #15181c;
+      --panel: #20252b;
+      --panel-2: #181c21;
+      --line: #303842;
+      --text: #e7edf3;
+      --muted: #a4afbd;
+      --accent: #2dd4bf;
+      --warn: #fbbf24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    h1 { margin: 0 0 8px; font-size: 24px; font-weight: 650; }
+    p { color: var(--muted); line-height: 1.65; }
+    .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 22px; }
+    .option { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; overflow: hidden; }
+    .head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+    .letter { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--accent); border-radius: 6px; color: var(--accent); font-weight: 700; }
+    .title { font-size: 16px; font-weight: 650; }
+    .mock { height: 220px; background: var(--panel-2); border-bottom: 1px solid var(--line); display: grid; grid-template-rows: 30px 1fr 24px; }
+    .toolbar { border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding: 0 10px; }
+    .icon { width: 14px; height: 14px; border: 1px solid var(--muted); border-radius: 3px; }
+    .body { display: grid; grid-template-columns: 42px 1fr; min-height: 0; }
+    .rail { border-right: 1px solid var(--line); padding: 8px; display: grid; align-content: start; gap: 10px; }
+    .rail .icon:first-child { border-color: var(--accent); background: rgba(45, 212, 191, .13); }
+    .workspace { padding: 12px; display: grid; gap: 10px; }
+    .band { height: 18px; border: 1px solid var(--line); border-radius: 4px; }
+    .table { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; border: 1px solid var(--line); }
+    .cell { min-height: 20px; background: #151a20; }
+    .drawer { border-top: 1px solid var(--line); display: flex; align-items: center; padding: 0 10px; gap: 10px; color: var(--muted); font-size: 12px; }
+    .details { padding: 14px 16px 16px; }
+    ul { margin: 10px 0 0; padding-left: 18px; color: var(--muted); line-height: 1.7; }
+    .recommended { color: var(--accent); font-size: 13px; margin-left: auto; }
+    .note { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; color: var(--muted); }
+    @media (max-width: 920px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Phase 1.5：UI 模块完整、独立的范围选择</h1>
+    <p>这一步不做真实业务数据读写，重点是让后续 Table / Enum / Meta / 校验 / 导入导出界面都能复用同一套 UI Kit、主题、布局和弹窗治理。</p>
+
+    <section class="grid">
+      <article class="option">
+        <div class="head"><div class="letter">A</div><div class="title">治理优先</div></div>
+        <div class="mock">
+          <div class="toolbar"><div class="icon"></div><div class="icon"></div><div class="icon"></div></div>
+          <div class="body"><div class="rail"><div class="icon"></div><div class="icon"></div></div><div class="workspace"><div class="band"></div><div class="band"></div><div class="band"></div></div></div>
+          <div class="drawer">tokens / icons / dialogs / tests</div>
+        </div>
+        <div class="details">
+          <p>聚焦主题 token、组件封装、禁止裸用 Qt 默认控件、截图回归规则。</p>
+          <ul><li>最快降低反复返工</li><li>Demo 可视效果较弱</li><li>适合先做工程防线</li></ul>
+        </div>
+      </article>
+
+      <article class="option">
+        <div class="head"><div class="letter">B</div><div class="title">UI Kit + Demo 闭环</div><div class="recommended">推荐</div></div>
+        <div class="mock">
+          <div class="toolbar"><div class="icon"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div></div>
+          <div class="body"><div class="rail"><div class="icon"></div><div class="icon"></div><div class="icon"></div></div><div class="workspace"><div class="band"></div><div class="table"><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div></div></div>
+          <div class="drawer">errors 2 / warnings 4 · diagnostics · logs</div>
+        </div>
+        <div class="details">
+          <p>建立独立 UI Demo 入口，展示工具栏、侧栏、状态栏、弹窗、表格、字段编辑和诊断抽屉。</p>
+          <ul><li>边界清晰，可人工验收</li><li>后续业务 UI 有样板</li><li>工作量适中，收益最大</li></ul>
+        </div>
+      </article>
+
+      <article class="option">
+        <div class="head"><div class="letter">C</div><div class="title">接近真实编辑器</div></div>
+        <div class="mock">
+          <div class="toolbar"><div class="icon"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div><div class="icon"></div></div>
+          <div class="body"><div class="rail"><div class="icon"></div><div class="icon"></div><div class="icon"></div></div><div class="workspace"><div class="table"><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div></div></div></div>
+          <div class="drawer">validation preview · filters · issue details</div>
+        </div>
+        <div class="details">
+          <p>在 UI Kit 同时预埋更像真实 Table 编辑器的交互状态和字段面板。</p>
+          <ul><li>视觉最接近最终产品</li><li>更容易越界到 Phase 3</li><li>更大返工风险</li></ul>
+        </div>
+      </article>
+    </section>
+
+    <div class="note">请回复 A / B / C。我的建议是 B：它能保证 UI 模块完整独立，又不会过早实现真实业务编辑逻辑。</div>
+  </main>
+</body>
+</html>
