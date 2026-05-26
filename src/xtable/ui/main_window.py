@@ -17,8 +17,10 @@ from PySide6.QtWidgets import (
 )
 
 from xtable.application.project_service import ProjectError, ProjectService
+from xtable.domain.models import NormalTableDefinition, ProjectSchema
 from xtable.domain.project import Project
 from xtable.ui.actions import ACTION_SPECS, create_actions
+from xtable.ui.components.tables import TableWorkbench
 from xtable.ui.dialogs import ProjectDialogs
 from xtable.ui.icons import icon_for
 from xtable.ui.issue_drawer import IssueDrawer
@@ -36,6 +38,8 @@ class MainWindow(QMainWindow):
         self.project_service = project_service or ProjectService()
         self.dialogs = dialogs or ProjectDialogs()
         self.current_project: Project | None = None
+        self.project_schema: ProjectSchema | None = None
+        self.table_workbench: TableWorkbench | None = None
         self.issue_counts = (0, 0, 0)
         self.setObjectName("xtable-main-window")
         self.setWindowTitle("XTable")
@@ -116,6 +120,18 @@ class MainWindow(QMainWindow):
 
         self.pages = QStackedWidget()
         self.pages.setObjectName("workspace-pages")
+        self.table_workbench = TableWorkbench()
+        self.table_workbench.setObjectName("page-table")
+        self.pages.addWidget(self.table_workbench)
+        enum_page = QLabel("Enum 工作区")
+        enum_page.setObjectName("page-enum")
+        enum_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pages.addWidget(enum_page)
+        meta_page = QLabel("Meta 工作区")
+        meta_page.setObjectName("page-meta")
+        meta_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pages.addWidget(meta_page)
+
         for key, title, icon_text in (
             ("table", "Table", "table"),
             ("enum", "Enum", "enum"),
@@ -132,11 +148,6 @@ class MainWindow(QMainWindow):
             button.setIcon(icon_for(icon_text, self.property("theme") or "light"))
             button.clicked.connect(lambda checked=False, page_key=key: self.show_page(page_key))
             rail_layout.addWidget(button)
-
-            page = QLabel(f"{title} 工作区")
-            page.setObjectName(f"page-{key}")
-            page.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.pages.addWidget(page)
 
         rail_layout.addStretch()
         work_layout.addWidget(rail)
@@ -229,6 +240,7 @@ class MainWindow(QMainWindow):
         try:
             root = options.pop("root")
             self.current_project = self.project_service.create_project(root, **options)
+            self._load_project_schema()
             self._show_project_state("已创建项目")
         except ProjectError as error:
             self.dialogs.show_error(self, "新建项目失败", str(error))
@@ -239,6 +251,7 @@ class MainWindow(QMainWindow):
             return
         try:
             self.current_project = self.project_service.open_project(root)
+            self._load_project_schema()
             self._show_project_state("已打开项目")
         except ProjectError as error:
             self.dialogs.show_error(self, "打开项目失败", str(error))
@@ -258,6 +271,25 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"{message}：{self.current_project.settings.name}")
         self.statusBar().set_project(self.current_project.settings.name)
+
+    def _load_project_schema(self) -> None:
+        if self.current_project is None or self.table_workbench is None:
+            return
+        try:
+            self.project_schema = self.project_service.load_schema(self.current_project)
+        except ProjectError:
+            self.project_schema = ProjectSchema()
+        normal_tables = [
+            table for table in self.project_schema.tables.values()
+            if isinstance(table, NormalTableDefinition)
+        ]
+        if normal_tables:
+            self._set_table(normal_tables[0])
+
+    def _set_table(self, table: NormalTableDefinition) -> None:
+        if self.table_workbench is None:
+            return
+        self.table_workbench.set_table(table)
 
     def open_ui_kit_demo(self) -> None:
         from xtable.ui.demo import create_demo_window

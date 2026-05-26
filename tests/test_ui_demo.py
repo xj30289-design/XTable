@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QSlider,
     QSpinBox,
     QStackedWidget,
+    QTableView,
     QTableWidget,
     QToolButton,
 )
@@ -38,6 +39,8 @@ def test_ui_kit_demo_window_exposes_complete_editor_shell():
     assert window.findChild(object, "workspace-tabs") is not None
     assert window.findChild(object, "data-list-view") is not None
     assert window.findChild(object, "json-editor-shell") is not None
+    assert window.findChild(object, "table-workbench") is not None
+    assert window.findChild(QTableView, "table-workbench-view") is not None
     assert window.findChild(QStackedWidget, "workspace-pages") is not None
     for page_key in (
         "overview",

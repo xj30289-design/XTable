@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Any
 
@@ -123,6 +124,24 @@ class FieldDefinition:
     @property
     def resolved_export_name(self) -> str:
         return self.export_name or self.name
+
+    def empty_value(self) -> Any:
+        if self.field_type in {FieldType.STRING, FieldType.ENUM, FieldType.REFERENCE}:
+            return ""
+        if self.field_type in {FieldType.INT, FieldType.FLOAT, FieldType.ID}:
+            return None
+        if self.field_type == FieldType.BOOL:
+            return False
+        if self.field_type == FieldType.LIST:
+            return []
+        if self.field_type in {FieldType.META, FieldType.JSON}:
+            return {}
+        return None
+
+    def initial_value(self) -> Any:
+        if self.default_value is not None:
+            return deepcopy(self.default_value)
+        return self.empty_value()
 
     def validate_shape(self) -> None:
         reference_parameters = {
@@ -309,6 +328,30 @@ class MetaDefinition:
         raise KeyError(f"Unknown meta field: {field_id_or_name}")
 
 
+@dataclass(frozen=True)
+class ModelReference:
+    source_kind: str
+    source_id: str
+    field_id: str
+    field_name: str
+    target_kind: str
+    target_id: str
+    target_field_id: str = ""
+
+
+@dataclass(frozen=True)
+class SchemaChangeImpact:
+    action: str
+    target_kind: str
+    target_id: str
+    references: tuple[ModelReference, ...] = ()
+    blockers: tuple[str, ...] = ()
+
+    @property
+    def blocked(self) -> bool:
+        return bool(self.references or self.blockers)
+
+
 class ProjectSchema:
     def __init__(self) -> None:
         self.tables: dict[str, TableDefinition] = {}
@@ -351,6 +394,142 @@ class ProjectSchema:
             return self.metas[field.meta_id]
         raise ValueError(f"Field {field.field_id} does not reference another model")
 
+    def table_reference_graph(self) -> dict[str, set[str]]:
+        graph: dict[str, set[str]] = {table_id: set() for table_id in self.tables}
+        for table_id, table in self.tables.items():
+            for field_definition in table.fields:
+                if field_definition.field_type == FieldType.REFERENCE and field_definition.target_table_id in self.tables:
+                    graph[table_id].add(field_definition.target_table_id)
+        return graph
+
+    def find_table_reference_cycles(self) -> tuple[tuple[str, ...], ...]:
+        return self._find_cycles(self.table_reference_graph())
+
+    def reference_index(self) -> tuple[ModelReference, ...]:
+        references: list[ModelReference] = []
+        for table in self.tables.values():
+            references.extend(self._field_references("table", table.table_id, table.fields))
+        for meta in self.metas.values():
+            references.extend(self._field_references("meta", meta.meta_id, meta.fields))
+            for table_id in meta.references:
+                references.append(
+                    ModelReference(
+                        source_kind="meta",
+                        source_id=meta.meta_id,
+                        field_id="",
+                        field_name="",
+                        target_kind="table",
+                        target_id=table_id,
+                    )
+                )
+        return tuple(references)
+
+    def references_to_enum(self, enum_id: str) -> tuple[ModelReference, ...]:
+        return tuple(reference for reference in self.reference_index() if reference.target_kind == "enum" and reference.target_id == enum_id)
+
+    def references_to_meta(self, meta_id: str) -> tuple[ModelReference, ...]:
+        return tuple(reference for reference in self.reference_index() if reference.target_kind == "meta" and reference.target_id == meta_id)
+
+    def references_to_table(self, table_id: str) -> tuple[ModelReference, ...]:
+        return tuple(reference for reference in self.reference_index() if reference.target_kind == "table" and reference.target_id == table_id)
+
+    def references_to_field(self, table_id: str, field_id_or_name: str) -> tuple[ModelReference, ...]:
+        table = self.table(table_id)
+        target_field = table.field(field_id_or_name)
+        return tuple(
+            reference
+            for reference in self.references_to_table(table_id)
+            if reference.target_field_id in {target_field.field_id, target_field.name}
+        )
+
+    def create_empty_row(self, table_id: str) -> TableRow:
+        table = self.table(table_id)
+        return TableRow(values={field_definition.name: field_definition.initial_value() for field_definition in table.fields})
+
+    def deletion_impact(self, target_kind: str, target_id: str) -> SchemaChangeImpact:
+        if target_kind == "enum":
+            references = self.references_to_enum(target_id)
+        elif target_kind == "meta":
+            references = self.references_to_meta(target_id)
+        elif target_kind == "table":
+            references = self.references_to_table(target_id)
+        else:
+            raise ValueError(f"Unsupported deletion target_kind: {target_kind}")
+        return SchemaChangeImpact(action="delete", target_kind=target_kind, target_id=target_id, references=references)
+
+    def field_change_impact(self, table_id: str, field_id_or_name: str) -> SchemaChangeImpact:
+        table = self.table(table_id)
+        target_field = table.field(field_id_or_name)
+        blockers = self._table_field_parameter_blockers(table, target_field)
+        references = self.references_to_field(table_id, field_id_or_name)
+        return SchemaChangeImpact(
+            action="change_field",
+            target_kind="field",
+            target_id=f"{table_id}.{target_field.field_id}",
+            references=references,
+            blockers=blockers,
+        )
+
+    def copy_field(
+        self,
+        table_id: str,
+        field_id_or_name: str,
+        *,
+        new_field_id: str,
+        new_name: str,
+        display_name: str | None = None,
+        reference_redirects: dict[str, dict[str, str]] | None = None,
+    ) -> FieldDefinition:
+        field_definition = self.table(table_id).field(field_id_or_name)
+        copied = replace(
+            field_definition,
+            field_id=new_field_id,
+            name=new_name,
+            display_name=display_name or field_definition.display_name,
+            default_value=deepcopy(field_definition.default_value),
+        )
+        return self._redirect_field(copied, reference_redirects or {})
+
+    def copy_table(
+        self,
+        table_id: str,
+        *,
+        new_table_id: str,
+        display_name: str | None = None,
+        reference_redirects: dict[str, dict[str, str]] | None = None,
+    ) -> TableDefinition:
+        copied = deepcopy(self.table(table_id))
+        copied.table_id = new_table_id
+        if display_name is not None:
+            copied.display_name = display_name
+        redirects = reference_redirects or {}
+        copied.fields = [self._redirect_field(field_definition, redirects) for field_definition in copied.fields]
+        return copied
+
+    def copy_enum(self, enum_id: str, *, new_enum_id: str, display_name: str | None = None) -> EnumDefinition:
+        copied = deepcopy(self.enum(enum_id))
+        copied.enum_id = new_enum_id
+        if display_name is not None:
+            copied.display_name = display_name
+        return copied
+
+    def copy_meta(
+        self,
+        meta_id: str,
+        *,
+        new_meta_id: str,
+        display_name: str | None = None,
+        reference_redirects: dict[str, dict[str, str]] | None = None,
+    ) -> MetaDefinition:
+        copied = deepcopy(self.meta(meta_id))
+        copied.meta_id = new_meta_id
+        if display_name is not None:
+            copied.display_name = display_name
+        redirects = reference_redirects or {}
+        copied.fields = [self._redirect_field(field_definition, redirects) for field_definition in copied.fields]
+        copied.references = tuple(redirects.get("table", {}).get(table_id, table_id) for table_id in copied.references)
+        return copied
+
     def validate_structure(self) -> None:
         for enum in self.enums.values():
             self._validate_enum(enum)
@@ -360,6 +539,7 @@ class ProjectSchema:
                 self._validate_field_reference(field_definition)
         for table in self.tables.values():
             self._validate_table(table)
+        self._validate_meta_reference_cycles()
 
     def _validate_enum(self, enum: EnumDefinition) -> None:
         item_ids = [item.item_id for item in enum.items]
@@ -465,3 +645,110 @@ class ProjectSchema:
             raise ValueError(f"Table {table_id} row {row_index} field {field_definition.name} expected string")
         if field_definition.field_type == FieldType.LIST and not isinstance(value, list):
             raise ValueError(f"Table {table_id} row {row_index} field {field_definition.name} expected list")
+
+    def _validate_meta_reference_cycles(self) -> None:
+        graph: dict[str, set[str]] = {meta_id: set() for meta_id in self.metas}
+        for meta_id, meta in self.metas.items():
+            for field_definition in meta.fields:
+                if field_definition.field_type == FieldType.META and field_definition.meta_id in self.metas:
+                    graph[meta_id].add(field_definition.meta_id)
+        cycles = self._find_cycles(graph)
+        if cycles:
+            cycle = " -> ".join(cycles[0])
+            raise ValueError(f"Meta reference cycle detected: {cycle}")
+
+    def _find_cycles(self, graph: dict[str, set[str]]) -> tuple[tuple[str, ...], ...]:
+        cycles: set[tuple[str, ...]] = set()
+        path: list[str] = []
+        visiting: set[str] = set()
+        visited: set[str] = set()
+
+        def visit(node: str) -> None:
+            if node in visiting:
+                index = path.index(node)
+                cycle = path[index:] + [node]
+                smallest = min(range(len(cycle) - 1), key=lambda item: cycle[item])
+                normalized = cycle[smallest:-1] + cycle[:smallest] + [cycle[smallest]]
+                cycles.add(tuple(normalized))
+                return
+            if node in visited:
+                return
+            visiting.add(node)
+            path.append(node)
+            for target in sorted(graph.get(node, ())):
+                visit(target)
+            path.pop()
+            visiting.remove(node)
+            visited.add(node)
+
+        for node in sorted(graph):
+            visit(node)
+        return tuple(sorted(cycles))
+
+    def _field_references(self, source_kind: str, source_id: str, fields: list[FieldDefinition]) -> list[ModelReference]:
+        references: list[ModelReference] = []
+        for field_definition in fields:
+            if field_definition.field_type == FieldType.ENUM:
+                references.append(
+                    ModelReference(
+                        source_kind=source_kind,
+                        source_id=source_id,
+                        field_id=field_definition.field_id,
+                        field_name=field_definition.name,
+                        target_kind="enum",
+                        target_id=field_definition.enum_id,
+                    )
+                )
+            if field_definition.field_type == FieldType.META:
+                references.append(
+                    ModelReference(
+                        source_kind=source_kind,
+                        source_id=source_id,
+                        field_id=field_definition.field_id,
+                        field_name=field_definition.name,
+                        target_kind="meta",
+                        target_id=field_definition.meta_id,
+                    )
+                )
+            if field_definition.field_type == FieldType.REFERENCE:
+                references.append(
+                    ModelReference(
+                        source_kind=source_kind,
+                        source_id=source_id,
+                        field_id=field_definition.field_id,
+                        field_name=field_definition.name,
+                        target_kind="table",
+                        target_id=field_definition.target_table_id,
+                        target_field_id=field_definition.target_field_id,
+                    )
+                )
+        return references
+
+    def _table_field_parameter_blockers(self, table: TableDefinition, field_definition: FieldDefinition) -> tuple[str, ...]:
+        names = {field_definition.field_id, field_definition.name}
+        blockers: list[str] = []
+        if table.primary_key in names:
+            blockers.append(f"primary_key:{table.primary_key}")
+        blockers.extend(f"feature_key:{feature_key}" for feature_key in table.feature_keys if feature_key in names)
+        if isinstance(table, GroupTableDefinition) and table.group_key in names:
+            blockers.append(f"group_key:{table.group_key}")
+        if isinstance(table, MatrixTableDefinition):
+            matrix_fields = {
+                "x_axis": table.x_axis,
+                "y_axis": table.y_axis,
+                "value_field": table.value_field,
+            }
+            blockers.extend(f"{parameter}:{value}" for parameter, value in matrix_fields.items() if value in names)
+        return tuple(blockers)
+
+    def _redirect_field(self, field_definition: FieldDefinition, redirects: dict[str, dict[str, str]]) -> FieldDefinition:
+        if field_definition.field_type == FieldType.ENUM:
+            return replace(field_definition, enum_id=redirects.get("enum", {}).get(field_definition.enum_id, field_definition.enum_id))
+        if field_definition.field_type == FieldType.META:
+            return replace(field_definition, meta_id=redirects.get("meta", {}).get(field_definition.meta_id, field_definition.meta_id))
+        if field_definition.field_type == FieldType.REFERENCE:
+            return replace(
+                field_definition,
+                target_table_id=redirects.get("table", {}).get(field_definition.target_table_id, field_definition.target_table_id),
+            )
+        return field_definition

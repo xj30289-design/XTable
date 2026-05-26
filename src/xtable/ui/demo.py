@@ -29,6 +29,7 @@ from xtable.ui.components import (
     MetaEditorShell,
     PickerShell,
     PreviewTable,
+    TableWorkbench,
     WorkspaceTabs,
 )
 from xtable.ui.dialogs import ConfirmDialog, MessageDialog
@@ -199,17 +200,18 @@ class UiKitDemoWindow(EditorShell):
         fill_button.setObjectName("table-batch-fill-button")
         fill_button.setIcon(icon_for("validate"))
         fill_button.setToolTip("批量填充选区")
-        table = PreviewTable(row_count=32, column_count=10)
-        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(table.copy_selection()))
-        paste_button.clicked.connect(lambda: table.paste_tsv(QApplication.clipboard().text()))
-        fill_button.clicked.connect(lambda: table.batch_fill(fill_input.text()))
+        self.preview_table.setRowCount(32)
+        self.preview_table.setColumnCount(10)
+        copy_button.clicked.connect(lambda: QApplication.clipboard().setText(self.preview_table.copy_selection()))
+        paste_button.clicked.connect(lambda: self.preview_table.paste_tsv(QApplication.clipboard().text()))
+        fill_button.clicked.connect(lambda: self.preview_table.batch_fill(fill_input.text()))
         toolbar.addWidget(fill_input)
         toolbar.addWidget(copy_button)
         toolbar.addWidget(paste_button)
         toolbar.addWidget(fill_button)
         toolbar.addStretch()
         layout.addLayout(toolbar)
-        layout.addWidget(table, 1)
+        layout.addWidget(self.preview_table, 1)
         return self._make_lab_page("Tables", body)
 
     def _build_forms_page(self) -> QWidget:
@@ -240,7 +242,7 @@ class UiKitDemoWindow(EditorShell):
         layout = QHBoxLayout(page)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self.preview_table, 1)
+        layout.addWidget(TableWorkbench(), 1)
         layout.addWidget(self.field_inspector)
         return page
 

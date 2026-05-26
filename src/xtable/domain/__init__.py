@@ -10,14 +10,17 @@ from xtable.domain.models import (
     GroupTableDefinition,
     MatrixTableDefinition,
     MetaDefinition,
+    ModelReference,
     NormalTableDefinition,
     ProjectSchema,
+    SchemaChangeImpact,
     TableDefinition,
     TableRow,
     TableType,
     TableTypeDefinition,
     TableTypeRegistry,
 )
+from xtable.domain.serialization import migrate_project_schema_dict, project_schema_from_dict, project_schema_to_dict
 
 __all__ = [
     "EnumDefinition",
@@ -29,11 +32,16 @@ __all__ = [
     "GroupTableDefinition",
     "MatrixTableDefinition",
     "MetaDefinition",
+    "ModelReference",
     "NormalTableDefinition",
     "ProjectSchema",
+    "SchemaChangeImpact",
     "TableDefinition",
     "TableRow",
     "TableType",
     "TableTypeDefinition",
     "TableTypeRegistry",
+    "project_schema_from_dict",
+    "project_schema_to_dict",
+    "migrate_project_schema_dict",
 ]
