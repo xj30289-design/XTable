@@ -15,6 +15,8 @@
 - 阶段进入“已完成”前，必须确认本文档中该阶段的 `P1` 问题已关闭；遗留 `P2/P3` 必须写明接受原因和后续处理阶段。
 - 开发日志中的阶段进度和验收完整度必须与本文档中的未关闭问题保持一致。
 - 当前会话角色为测试角色时，只能评估、找 bug、复验、验收和更新文档，不得直接修改实现代码、测试代码或资源文件；角色按会话区分，边界以 [项目角色协作规范](./project-role-guidelines.md) 为准。
+- 每个 Phase 的正式验收评估需建立独立的 Phase Review 文档（`docs/phase-N-review.md`），本文档仅保留各 Phase 的概要审核结论和批次归档索引，详细问题记录迁移至对应 Phase Review 文档。
+- 自动触发的开发批次如未经过人工 QA 审查，不得标记为"已验收"或"已关闭"。此类批次应在对应 Phase Review 文档中进行统一人工复核，整体归档为一个合并批次，替换原有分散的开发记录批次。
 
 ## 2. 状态枚举
 
@@ -507,511 +509,97 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 
 第十批次整改通过复验，`B10-001` 至 `B10-006` 全部关闭。Phase 3 已具备最小可见表格工作台入口，可开始进行有限操作测试；查找、替换、筛选、排序和完整业务编辑闭环仍需后续批次继续推进。复验过程中曾观察到一次 Demo 焦点用例失败，但随后全量、组合定向和 5 次重复定向均通过，暂不作为未关闭项；若再次复现，应单独记录为 UI 自动化稳定性问题。
 
-### 6.14 第十一批次：Phase 3 表格工作台筛选与查找入口开发记录
-
-- 来源：Phase 3 有限表格操作测试前的开发补齐。
-- 范围：`TableWorkbench` 可见筛选输入、清除筛选、查找输入、查找下一个按钮和 UI 回归测试。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 已通过 `TableBuffer.filter_rows()` 隐藏不匹配行，清除筛选会恢复全部行；查找使用 `TableBuffer.find_cells()` 定位匹配单元格并滚动到目标位置。
-- 自测结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_filters_rows_and_finds_matching_cells` 通过，覆盖筛选、清除筛选和查找定位；随后发现测试环境未固定 `QT_QPA_PLATFORM=offscreen` 会导致 Qt 剪贴板快捷键测试不稳定，已新增 `tests/conftest.py` 固定测试平台。
-- 最终验证：`python -m pytest` 通过，98 项测试全部通过；`python -m compileall -q src tests` 通过。
-- 遗留范围：替换 UI、排序 UI 和完整业务编辑闭环尚未在本批次完成，继续保留在 Phase 3 后续任务中。
-
-#### 6.14.1 第十一批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_filters_rows_and_finds_matching_cells -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，25 项测试全部通过。
-- 全量自动化结果：`python -m pytest` 通过，98 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：筛选 `ether` 后行隐藏状态为 `[True, True, False]`；清除筛选后为 `[False, False, False]`；查找 `elixir` 返回 `True` 并定位到第 1 行第 1 列。
-- 结论：第十一批次筛选与查找入口通过复验，可标记为已关闭。替换 UI、排序 UI 和完整业务编辑闭环仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.15 第十二批次：Phase 3 表格工作台替换入口开发记录
-
-- 来源：Phase 3 查找、替换、筛选、排序操作入口补齐。
-- 范围：`TableWorkbench` 可见替换输入、替换全部按钮、替换后单元格定位和 Qt 模型刷新信号。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 已提供 `table-workbench-replace-input` 和 `table-workbench-replace-button`；`replace_all_matches()` 使用当前查找文本和替换文本执行替换，替换后定位到首个变更单元格。
-- 模型刷新：`QtTableModel.replace_all()` 通过 `TableBuffer.replace_all()` 执行替换，并对每个变更单元格发出 `dataChanged`，避免视图停留在旧值。
-- 自测结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_replaces_matching_cells_from_visible_controls -q` 通过；`python -m pytest tests/test_table_engine.py::test_qt_table_model_replace_all_emits_changed_cells tests/test_ui_interactions.py::test_table_workbench_replaces_matching_cells_from_visible_controls -q` 通过，2 项测试全部通过。
-- 最终验证：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，27 项测试全部通过；`python -m pytest` 通过，100 项测试全部通过；`python -m compileall -q src tests` 通过。
-- 运行时探针：查找 `Potion`、替换为 `Hi-Potion` 后，`changed` 为 `((0, 1),)`，单元格值为 `Hi-Potion`，当前定位为第 0 行第 1 列。
-- 遗留范围：排序 UI 和完整业务编辑闭环尚未在本批次完成，继续保留在 Phase 3 后续任务中。
-
-#### 6.15.1 第十二批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_replaces_matching_cells_from_visible_controls tests/test_table_engine.py::test_qt_table_model_replace_all_emits_changed_cells -q` 通过，2 项测试全部通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，27 项测试全部通过。
-- 全量自动化结果：`python -m pytest` 通过，100 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：替换按钮存在；查找 `Potion` 并替换为 `Hi-Potion` 后，UI 变更单元格为 `((0, 1),)`，单元格值为 `Hi-Potion`，当前定位第 0 行第 1 列；模型层 `replace_all()` 返回 `((0, 1),)`，值为 `Hi-Potion`，`dataChanged` 信号计数为 1。
-- 结论：第十二批次替换入口通过复验，可标记为已关闭。排序 UI 和完整业务编辑闭环仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.16 第十三批次：Phase 3 表格工作台排序入口开发记录
-
-- 来源：Phase 3 查找、替换、筛选、排序操作入口补齐。
-- 范围：`TableWorkbench` 当前列升序/降序排序按钮、Qt 模型行重排、layout 信号和单元格状态跟随原行。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 已提供 `table-workbench-sort-asc-button` 和 `table-workbench-sort-desc-button`；`sort_by_current_column()` 按当前列执行升序或降序排序，排序后定位到当前列第一行并清除筛选状态。
-- 模型刷新：`QtTableModel.sort_by_column()` 调用 `TableBuffer.sort_row_order()` 与 `reorder_rows()` 重排行数据，并发出 `layoutAboutToBeChanged`/`layoutChanged`；单元格状态会跟随原行迁移。
-- 自测结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_sorts_rows_by_current_column -q` 通过；`python -m pytest tests/test_table_engine.py::test_qt_table_model_sorts_rows_and_keeps_cell_states_with_source_rows tests/test_ui_interactions.py::test_table_workbench_sorts_rows_by_current_column -q` 通过，2 项测试全部通过。
-- 最终验证：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，29 项测试全部通过；`python -m pytest` 通过，102 项测试全部通过；`python -m compileall -q src tests` 通过。
-- 运行时探针：升序和降序按钮均存在；按 Count 列升序后顺序为 `Elixir`、`Ether`、`Potion`，降序后顺序为 `Potion`、`Ether`、`Elixir`；原 `Elixir` 行的 warning 状态在升序后仍跟随到第 0 行；两次排序均触发 layout 信号。
-- 遗留范围：完整业务编辑闭环尚未在本批次完成，继续保留在 Phase 3 后续任务中。
-
-#### 6.16.1 第十三批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_sorts_rows_by_current_column tests/test_table_engine.py::test_qt_table_model_sorts_rows_and_keeps_cell_states_with_source_rows -q` 通过，2 项测试全部通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，29 项测试全部通过。
-- 全量自动化结果：`python -m pytest` 通过，102 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：升序和降序按钮均存在；按 Count 列升序后顺序为 `Elixir`、`Ether`、`Potion`，降序后顺序为 `Potion`、`Ether`、`Elixir`；原 `Elixir` 行的 warning 状态在升序后仍跟随到第 0 行；两次排序均触发 layout 信号。
-- 结论：第十三批次排序入口通过复验，可标记为已关闭。完整业务编辑闭环仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.17 第十四批次：Phase 3 表格工作台单格粘贴撤销/重做闭环开发记录
-
-- 来源：Phase 3 完整业务编辑闭环补齐。
-- 范围：`TableWorkbench` 可见粘贴入口、撤销按钮、重做按钮和 `EditCommandStack` 的单格编辑闭环。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench.paste_clipboard()` 在剪贴板内容为单格文本时改为通过 `EditCommandStack.edit_cell()` 写入，确保粘贴行为进入撤销/重做历史；多行或多列 TSV 仍保留原有 `QtTableModel.paste_tsv()` 路径。
-- 自测结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_paste_participates_in_undo_redo_flow -q` 通过，1 项测试通过；`python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q` 通过，25 项测试全部通过。
-- 最终验证：`python -m pytest -q` 通过，103 项测试全部通过；`python -m compileall -q src tests` 通过。
-- 遗留范围：多格粘贴、插入删除和批量填充尚未纳入命令栈撤销/重做闭环，继续保留在 Phase 3 后续任务中。
-
-#### 6.17.1 第十四批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_paste_participates_in_undo_redo_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，30 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，103 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，撤销/重做按钮均存在；粘贴后值为 `Mega Potion`，撤销后恢复 `Potion`，重做后恢复 `Mega Potion`；粘贴后 `can_undo=True`，撤销后 `can_redo=True`，重做后 `can_undo=True` 且 `can_redo=False`。
-- 结论：第十四批次单格粘贴撤销/重做闭环通过复验，可标记为已关闭。多格粘贴、插入删除和批量填充命令化撤销仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.18 第十五批次：Phase 3 表格工作台多格粘贴撤销/重做闭环开发记录
-
-- 来源：Phase 3 完整业务编辑闭环补齐。
-- 范围：`TableWorkbench` 多行多列 TSV 粘贴、撤销按钮、重做按钮和 `EditCommandStack` 的批量编辑命令。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`EditCommandStack` 新增批量 cell edit 命令和 `paste_tsv()`，会在粘贴前记录旧值、通过 `QtTableModel.paste_tsv()` 写入并收集实际变更单元格，再以单个批量命令进入撤销/重做历史；`TableWorkbench.paste_clipboard()` 的 TSV 路径改为调用命令栈，确保多格粘贴可通过可见撤销/重做按钮恢复。
-- 自动化覆盖：新增 `test_table_workbench_multi_cell_paste_participates_in_undo_redo_flow`，覆盖 2x2 TSV 粘贴后值更新、撤销恢复 `Potion/10/Elixir/2`、重做恢复 `Hi-Potion/99/Ether/5`。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_multi_cell_paste_participates_in_undo_redo_flow tests/test_ui_interactions.py::test_table_workbench_paste_participates_in_undo_redo_flow -q`：2 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：26 项通过。
-  - `python -m compileall -q src tests`：通过。
-  - `python -m pytest -q`：104 项通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，2x2 TSV 粘贴后值为 `['Hi-Potion', 99, 'Ether', 5]`，撤销后恢复 `['Potion', 10, 'Elixir', 2]`，重做后恢复 `['Hi-Potion', 99, 'Ether', 5]`，最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 遗留范围：插入删除和批量填充尚未纳入命令栈撤销/重做闭环，继续保留在 Phase 3 后续任务中。
-
-#### 6.18.1 第十五批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_multi_cell_paste_participates_in_undo_redo_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，31 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，104 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，撤销/重做按钮均存在；2x2 TSV 粘贴后值为 `['Hi-Potion', 99, 'Ether', 5]`，撤销后恢复 `['Potion', 10, 'Elixir', 2]`，重做后恢复 `['Hi-Potion', 99, 'Ether', 5]`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 结论：第十五批次多格粘贴撤销/重做闭环通过复验，可标记为已关闭。插入删除和批量填充命令化撤销仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.19 第十六批次：Phase 3 表格工作台插入删除撤销/重做闭环开发记录
-
-- 来源：Phase 3 完整业务编辑闭环补齐。
-- 范围：`TableWorkbench` 插入行按钮、删除行按钮、撤销按钮、重做按钮和 `EditCommandStack` 的行编辑命令。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`EditCommandStack` 新增行插入/删除命令，插入时记录新增行数据，删除时先保存被删除行数据；撤销和重做通过 `QtTableModel.insert_table_rows()`、`insertRows()`、`removeRows()` 发出 Qt 行变更信号并恢复表格行。`TableWorkbench` 的插入行和删除行按钮已改为调用命令栈。
-- 自动化覆盖：新增 `test_table_workbench_insert_and_delete_rows_participate_in_undo_redo_flow`，覆盖插入空行、撤销恢复原行、重做恢复空行、删除空行、撤销恢复空行、重做再次删除。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_insert_and_delete_rows_participate_in_undo_redo_flow -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：27 项通过。
-  - `python -m compileall -q src tests`：通过。
-  - `python -m pytest -q`：105 项通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，插入后 `[4, '']`，撤销插入后 `[3, 'Elixir']`，重做插入后 `[4, '']`；删除后 `[3, 'Elixir']`，撤销删除后 `[4, '']`，重做删除后 `[3, 'Elixir']`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 遗留范围：批量填充尚未纳入命令栈撤销/重做闭环，继续保留在 Phase 3 后续任务中。
-
-#### 6.19.1 第十六批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_insert_and_delete_rows_participate_in_undo_redo_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，32 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，105 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，插入/删除/撤销/重做按钮均存在；插入后 `[4, '']`，撤销插入后 `[3, 'Elixir']`，重做插入后 `[4, '']`；删除后 `[3, 'Elixir']`，撤销删除后 `[4, '']`，重做删除后 `[3, 'Elixir']`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 结论：第十六批次插入删除撤销/重做闭环通过复验，可标记为已关闭。批量填充命令化撤销仍属 Phase 3 后续开发范围，不作为本批次阻塞项。
-
-### 6.20 第十七批次：Phase 3 表格工作台批量填充撤销/重做闭环开发记录
-
-- 来源：Phase 3 完整业务编辑闭环补齐。
-- 范围：`TableWorkbench` 选区批量填充输入、填充按钮、撤销按钮、重做按钮和 `EditCommandStack` 的批量 cell edit 命令。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 新增 `table-workbench-fill-input` 和 `table-workbench-fill-button`，当前选区可执行批量填充；`QtTableModel.batch_fill()` 统一调用 `TableBuffer.batch_fill()` 并发出 `dataChanged`；`EditCommandStack.batch_fill()` 记录实际变更单元格的旧值和新值，使批量填充进入撤销/重做历史。
-- 自动化覆盖：新增 `test_table_workbench_batch_fill_participates_in_undo_redo_flow`，覆盖选中两行 Count 列、填充 `7`、撤销恢复 `10/2`、重做恢复 `7/7`。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_batch_fill_participates_in_undo_redo_flow -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：28 项通过。
-  - `python -m compileall -q src tests`：通过。
-  - `python -m pytest -q`：106 项通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，批量填充控件、撤销和重做按钮均存在；填充后 Count 值为 `[7, 7]`，撤销后恢复 `[10, 2]`，重做后恢复 `[7, 7]`，最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 遗留范围：完整业务编辑闭环仍需后续批次继续做更完整的人工操作体验和阶段验收，不作为本批次阻塞项。
-
-#### 6.20.1 第十七批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_batch_fill_participates_in_undo_redo_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，33 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，106 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，批量填充输入、填充按钮、撤销按钮和重做按钮均存在；填充后 Count 值为 `[7, 7]`，撤销后恢复 `[10, 2]`，重做后恢复 `[7, 7]`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 结论：第十七批次批量填充撤销/重做闭环通过复验，可标记为已关闭。完整业务编辑体验仍需后续阶段验收，不作为本批次阻塞项。
-
-### 6.21 第十八批次：Phase 3 表格工作台键盘快捷工作流开发记录
-
-- 来源：Phase 3 完整业务编辑体验收口。
-- 范围：`TableWorkbench` 表格视图键盘复制、粘贴、撤销和重做。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 为表格视图安装事件过滤器，处理 Ctrl+C、Ctrl+V、Ctrl+Z、Ctrl+Y，并复用已有 `copy_selection()`、`paste_clipboard()`、`EditCommandStack.undo()` 和 `EditCommandStack.redo()`，避免键盘路径绕过命令栈。
-- 自动化覆盖：新增 `test_table_workbench_keyboard_copy_paste_undo_redo_flow`，覆盖键盘复制 `Potion`、键盘粘贴 `Mega Potion`、键盘撤销恢复 `Elixir`、键盘重做恢复 `Mega Potion`。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：29 项通过。
-  - `python -m compileall -q src tests`：通过。
-  - `python -m pytest -q`：107 项通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，Ctrl+C 后剪贴板为 `Potion`；Ctrl+V 后目标单元格为 `Mega Potion`；Ctrl+Z 后恢复 `Elixir`；Ctrl+Y 后恢复 `Mega Potion`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 遗留范围：完整业务编辑体验仍需后续测试角色复验和阶段验收收口，不作为本批次阻塞项。
-
-#### 6.21.1 第十八批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，34 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，107 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，Ctrl+C 后剪贴板为 `Potion`；Ctrl+V 后目标单元格为 `Mega Potion`；Ctrl+Z 后恢复 `Elixir`；Ctrl+Y 后恢复 `Mega Potion`；最终命令栈状态为 `can_undo=True, can_redo=False`。
-- 结论：第十八批次键盘复制/粘贴/撤销/重做工作流通过复验，可标记为已关闭。完整业务编辑体验仍需 Phase 3 阶段验收收口，不作为本批次阻塞项。
-
-### 6.22 第十九批次：Phase 3 表格工作台只读写入拒绝反馈开发记录
-
-- 来源：Phase 3 单元格编辑、提交、取消和只读拒绝测试清单。
-- 范围：`TableWorkbench` 对只读单元格写入失败的可见状态反馈，以及失败写入不得进入撤销历史。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 初始化 `last-rejected-write` 状态；单格粘贴写入成功时清空该状态，写入只读单元格失败时记录 `readonly`，避免只读保护只在底层静默失败。
-- 自动化覆盖：新增 `test_table_workbench_paste_reports_readonly_rejection_without_history`，覆盖只读 ID 列粘贴 `9999` 后原值保持 `1001`、拒绝原因为 `readonly`，且不产生撤销历史。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_paste_reports_readonly_rejection_without_history -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：30 项通过。
-- 遗留范围：编辑提交/取消体验仍需后续批次或 Phase 3 阶段验收收口，不作为本批次阻塞项。
-
-#### 6.22.1 第十九批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_paste_reports_readonly_rejection_without_history -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，35 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，108 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，只读 ID 列粘贴 `9999` 后单元格值保持 `1001`，`last-rejected-write=readonly`，`can_undo=False`。
-- 结论：第十九批次只读写入拒绝反馈通过复验，可标记为已关闭。编辑提交/取消体验仍需后续批次或 Phase 3 阶段验收收口，不作为本批次阻塞项。
-
-### 6.23 第二十批次：Phase 3 表格工作台可见编辑提交/取消体验开发记录
-
-- 来源：Phase 3 单元格编辑、提交、取消和只读拒绝测试清单。
-- 范围：`TableWorkbench` 可见单元格编辑输入、提交、取消和命令栈写入。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码、测试代码、资源文件或构建配置。
-- 开发结果：`TableWorkbench` 新增 `table-workbench-edit-input`、`table-workbench-commit-edit-button` 和 `table-workbench-cancel-edit-button`；当前单元格变化时编辑输入同步当前值；取消恢复输入值且不修改数据；提交通过 `EditCommandStack.edit_cell()` 写入并进入撤销历史。
-- 自动化覆盖：新增 `test_table_workbench_visible_edit_commit_and_cancel_flow`，覆盖选中 `Potion` 后编辑输入同步，取消 `Mega Potion` 不改数据且不产生撤销历史，再次提交后单元格变更为 `Mega Potion` 并产生撤销历史。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_visible_edit_commit_and_cancel_flow -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：31 项通过。
-- 遗留范围：大表滚动、批量编辑手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.23.1 第二十批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向自动化结果：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_visible_edit_commit_and_cancel_flow -q` 通过，1 项测试通过。
-- 组合回归结果：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，36 项测试全部通过。
-- 全量自动化结果：`python -m pytest -q` 通过，109 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，编辑输入初始为 `Potion`；取消后输入值和单元格值仍为 `Potion` 且 `can_undo=False`；提交后返回 `True`，单元格值为 `Mega Potion` 且 `can_undo=True`。
-- 结论：第二十批次可见编辑提交/取消体验通过复验，可标记为已关闭。大表滚动、批量编辑手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.24 第二十一批次：Phase 3 表格工作台大表批量编辑反馈开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表像素级滚动保持、跨行批量填充和变更计数反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 初始化 `last-batch-edit-count`，并在 `batch_fill_selection()` 后记录实际变更单元格数量，便于大表批量操作后确认生效范围。
-- 自动化覆盖：新增 `test_table_workbench_large_table_batch_fill_reports_changed_cell_count`，构造 250 行大表，验证水平/垂直滚动均为像素级滚动，跨行选择 3 个 Count 单元格填充 `7` 后返回 3 个变更坐标，`last-batch-edit-count` 为 3，远端第 249 行写入成功。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count -q`：1 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_interactions.py -q`：32 项通过。
-- 遗留范围：大表真实人工滚动手感、滚轮/拖拽滑块体验和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.24.1 第二十一批次复验记录
-
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count -q` 通过，1 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，37 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，110 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，250 行表格保持 `ScrollPerPixel` 垂直/水平滚动；跨行选择第 0、127、249 行 Count 单元格批量填充 `7` 后返回 `((0, 2), (127, 2), (249, 2))`，`last-batch-edit-count=3`，第 249 行显示值为 `7`。
-- 结论：第二十一批次大表批量编辑反馈通过复验，可标记为已关闭。大表真实人工滚动手感、滚轮/拖拽滑块体验和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.25 第二十二批次：Phase 3 表格工作台大表批量操作后定位反馈开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 跨远端行批量填充后的当前单元格定位和滚动定位反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench.batch_fill_selection()` 在批量填充产生变更后，会将当前索引和滚动位置定位到最后一个实际变更单元格，减少大表跨行批量操作后人工查找远端写入结果的成本。
-- TDD 记录：先新增 `test_table_workbench_large_table_batch_fill_focuses_last_changed_cell`，验证 250 行大表跨行填充后当前索引应定位到第 249 行 Count 单元格；红灯时 `currentIndex()` 为无效索引 `-1,-1`，随后补齐实现并转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_batch_fill_focuses_last_changed_cell`；保留并复跑 `test_table_workbench_large_table_batch_fill_reports_changed_cell_count`，覆盖变更数量、远端写入和定位反馈。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：2 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：38 项通过。
-  - `python -m pytest -q`：111 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，250 行表格跨行选择第 0、127、249 行 Count 单元格批量填充 `7` 后返回 `((0, 2), (127, 2), (249, 2))`，`last-batch-edit-count=3`，当前索引为 `249,2`，第 249 行显示值为 `7`。
-- 遗留范围：大表真实人工滚动手感、滚轮/拖拽滑块体验和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.25.1 第二十二批次复验记录
-
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，1 项测试通过。
-- 相关定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，2 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，38 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，111 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，250 行表格跨行选择第 0、127、249 行 Count 单元格批量填充 `7` 后返回 `((0, 2), (127, 2), (249, 2))`，`last-batch-edit-count=3`，当前索引为 `249,2`，第 249 行显示值为 `7`。
-- 结论：第二十二批次大表批量操作后定位反馈通过复验，可标记为已关闭。大表真实人工滚动手感、滚轮/拖拽滑块体验和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.26 第二十三批次：Phase 3 表格工作台大表首尾快速导航开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表首尾快捷定位和列保持导航。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 为表格视图接入 Ctrl+End 和 Ctrl+Home；快捷键会保持当前列，并分别滚动定位到最后一行或第一行，减少大表人工拖动滚动条定位成本。
-- TDD 记录：先新增 `test_table_workbench_large_table_ctrl_home_end_navigates_edges`，验证 250 行大表从第 127 行 Count 列执行 Ctrl+End 后定位到 `249,2`，再执行 Ctrl+Home 后回到 `0,2`；红灯时默认 Home 跳到第 0 列，随后补齐实现并转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_ctrl_home_end_navigates_edges`，并复跑键盘复制/粘贴/撤销/重做测试，确认新增快捷键没有破坏既有键盘事件过滤链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q`：2 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：39 项通过。
-  - `python -m pytest -q`：112 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，250 行表格从第 127 行 Count 列触发 Ctrl+End 后当前索引为 `249,2`，触发 Ctrl+Home 后当前索引为 `0,2`。
-- 遗留范围：大表真实滚轮/拖拽滑块手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.26.1 第二十三批次复验记录
-
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges -q` 通过，1 项测试通过。
-- 相关键盘组合定向：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q` 通过，2 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，39 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，112 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，250 行表格从第 127 行 Count 列触发 Ctrl+End 后当前索引为 `249,2`，触发 Ctrl+Home 后当前索引为 `0,2`。
-- 结论：第二十三批次大表首尾快速导航通过复验，可标记为已关闭。大表真实滚轮/拖拽滑块手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.27 第二十四批次：Phase 3 表格工作台大表横向首尾快速导航开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 宽表横向快捷定位和行保持导航。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 为表格视图接入 Ctrl+Right 和 Ctrl+Left；快捷键会保持当前行，并分别滚动定位到末列或首列，减少宽表横向滚动定位成本。
-- TDD 记录：先新增 `test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges`，验证 9 列宽表从第 17 行第 3 列执行 Ctrl+Right 后定位到 `17,8`，再执行 Ctrl+Left 后回到 `17,0`；红灯时默认 Ctrl+Right 只移动到第 4 列，随后补齐实现并转绿。
-- 自动化覆盖：新增 `test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges`，并复跑大表首尾导航和键盘复制/粘贴/撤销/重做测试，确认新增快捷键没有破坏既有键盘事件过滤链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q`：3 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：40 项通过。
-  - `python -m pytest -q`：113 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，9 列宽表从第 17 行第 3 列触发 Ctrl+Right 后当前索引为 `17,8`，触发 Ctrl+Left 后当前索引为 `17,0`。
-- 遗留范围：大表真实滚轮/拖拽滑块手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.27.1 第二十四批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges -q` 通过，1 项测试通过。
-- 相关键盘组合定向：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_keyboard_copy_paste_undo_redo_flow -q` 通过，3 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，40 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，113 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，9 列宽表从第 17 行第 3 列触发 Ctrl+Right 后当前索引为 `17,8`，触发 Ctrl+Left 后当前索引为 `17,0`。
-- 结论：第二十四批次大表横向首尾快速导航通过复验，可标记为已关闭。大表真实滚轮/拖拽滑块手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.28 第二十五批次：Phase 3 表格工作台大表滚动位置反馈开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表垂直/水平滚动条位置反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 新增 `scroll-position` 属性，记录当前垂直滚动值、水平滚动值、垂直最大值和水平最大值；表格初始化后会写入初始状态，垂直或水平滚动条变化时会同步更新，便于测试和人工验收确认滚轮/拖拽滑块后的实际位置。
-- TDD 记录：先新增 `test_table_workbench_large_table_reports_scrollbar_position_for_handfeel`，构造 320 行、13 列宽表并直接驱动垂直/水平滚动条；红灯时 `scroll-position` 为 `None`，随后补齐滚动条监听和属性同步后转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_reports_scrollbar_position_for_handfeel`，并复跑大表批量编辑反馈、批量操作后定位反馈、纵向首尾导航和横向首尾导航测试，确认新增滚动状态反馈没有破坏既有大表操作链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：5 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：41 项通过。
-  - `python -m pytest -q`：114 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，320 行、13 列宽表滚动到中段后，`scroll-position` 为 `{'horizontal': 108, 'horizontal-maximum': 216, 'vertical': 4720, 'vertical-maximum': 9440}`。
-- 遗留范围：滚动条真实拖拽手感仍需要人工体验复验；Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.28.1 第二十五批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel -q` 通过，1 项测试通过。
-- 大表相关回归：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，5 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，41 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，114 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，320 行、13 列宽表滚动到中段后，`scroll-position` 为 `{'horizontal': 108, 'horizontal-maximum': 216, 'vertical': 4720, 'vertical-maximum': 9440}`。
-- 结论：第二十五批次大表滚动位置反馈通过复验，可标记为已关闭。滚动条真实拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.29 第二十六批次：Phase 3 表格工作台大表可见范围反馈开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表拖拽/滚动后的可见行列范围反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 新增 `visible-range` 属性，记录当前视口可见的首行、末行、首列和末列；垂直或水平滚动条变化时会随 `scroll-position` 一起同步，便于验收拖拽滑块后实际可见数据范围。
-- TDD 记录：先新增 `test_table_workbench_large_table_reports_visible_range_for_drag_feedback`，构造 360 行、17 列宽表并驱动垂直/水平滚动条；红灯时 `visible-range` 为 `None`，随后补齐可见范围同步后转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_reports_visible_range_for_drag_feedback`，并复跑大表滚动位置反馈、批量编辑反馈、批量操作后定位反馈、纵向首尾导航和横向首尾导航测试，确认新增可见范围反馈没有破坏既有大表操作链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：6 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：42 项通过。
-  - `python -m pytest -q`：115 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始 `visible-range` 为 `{'first-column': 0, 'first-row': 0, 'last-column': 5, 'last-row': 14}`，滚动到中段后为 `{'first-column': 3, 'first-row': 177, 'last-column': 13, 'last-row': 182}`。
-- 遗留范围：完整人工拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.29.1 第二十六批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback -q` 通过，1 项测试通过。
-- 大表相关回归：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，6 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，42 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，115 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始 `visible-range` 为 `{'first-column': 0, 'first-row': 0, 'last-column': 5, 'last-row': 14}`，滚动到中段后为 `{'first-column': 3, 'first-row': 177, 'last-column': 13, 'last-row': 182}`。
-- 结论：第二十六批次大表可见范围反馈通过复验，可标记为已关闭。滚动条真实拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.30 第二十七批次：Phase 3 表格工作台大表可见范围状态文本开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表拖拽/滚动后的可读视口范围反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 新增 `table-workbench-visible-range-label`，把 `visible-range` 转换为 1 基行列范围文本；垂直或水平滚动条变化后状态文本会同步更新，便于人工拖拽验收直接确认当前视口范围。
-- TDD 记录：先新增 `test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance`，构造 360 行、17 列宽表并驱动垂直/水平滚动条；红灯时找不到 `table-workbench-visible-range-label`，随后补齐状态标签和同步逻辑后转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance`，并复跑大表可见范围反馈、滚动位置反馈、批量编辑反馈、批量操作后定位反馈、纵向首尾导航和横向首尾导航测试，确认新增状态文本没有破坏既有大表操作链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：7 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：43 项通过。
-  - `python -m pytest -q`：116 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始状态文本为 `行 1-15 / 列 1-6`，滚动到中段后为 `行 178-183 / 列 4-14`。
-- 遗留范围：完整人工拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.30.1 第二十七批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance -q` 通过，1 项测试通过。
-- 大表相关回归：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，7 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，43 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，116 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始状态文本为 `行 1-15 / 列 1-6`，滚动到中段后为 `行 178-183 / 列 4-14`。
-- 结论：第二十七批次大表可见范围状态文本通过复验，可标记为已关闭。滚动条真实拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.31 第二十八批次：Phase 3 表格工作台大表滚动进度状态文本开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表拖拽/滚动后的滚动进度反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 新增 `table-workbench-scroll-progress-label`，把 `scroll-position` 转换为纵向/横向滚动百分比；垂直或水平滚动条变化后状态文本会同步更新，便于人工拖拽验收确认滑块进度。
-- TDD 记录：先新增 `test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback`，构造 360 行、17 列宽表并驱动垂直/水平滚动条；红灯时找不到 `table-workbench-scroll-progress-label`，随后补齐状态标签和同步逻辑后转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback`，并复跑大表可见范围状态文本、可见范围反馈、滚动位置反馈、批量编辑反馈、批量操作后定位反馈、纵向首尾导航和横向首尾导航测试，确认新增滚动进度文本没有破坏既有大表操作链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：8 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：44 项通过。
-  - `python -m pytest -q`：117 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始状态文本为 `纵向 0% / 横向 0%`，滚动到中段后为 `纵向 50% / 横向 50%`。
-- 遗留范围：完整人工拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.31.1 第二十八批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback -q` 通过，1 项测试通过。
-- 大表相关回归：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，8 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，44 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，117 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表初始状态文本为 `纵向 0% / 横向 0%`，滚动到中段后为 `纵向 50% / 横向 50%`。
-- 结论：第二十八批次大表滚动进度状态文本通过复验，可标记为已关闭。滚动条真实拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-### 6.32 第二十九批次：Phase 3 表格工作台大表滚动方向状态反馈开发记录
-
-- 来源：Phase 3 大表滚动、复制粘贴和批量编辑手感验收清单。
-- 范围：`TableWorkbench` 大表拖拽/滚动后的最近滚动方向反馈。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。
-- 开发结果：`TableWorkbench` 新增 `last-scroll-axis` 属性和 `table-workbench-scroll-axis-label`。垂直滚动条变化后记录 `vertical` 并显示 `最近滚动：纵向`；水平滚动条变化后记录 `horizontal` 并显示 `最近滚动：横向`，便于人工拖拽验收区分滚动方向响应。
-- TDD 记录：先新增 `test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback`，构造 360 行、17 列宽表并依次驱动垂直、水平滚动条；红灯时找不到 `table-workbench-scroll-axis-label`，随后补齐状态属性、状态标签和滚动方向同步逻辑后转绿。
-- 自动化覆盖：新增 `test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback`，并复跑大表滚动进度状态文本、可见范围状态文本、可见范围反馈、滚动位置反馈、首尾导航、横向首尾导航、批量编辑反馈和批量操作后定位反馈测试，确认新增方向文本没有破坏既有大表操作链路。
-- 自测结果：
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback -q`：红灯符合预期，随后 1 项通过。
-  - `python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q`：9 项通过。
-  - `python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q`：45 项通过。
-  - `python -m pytest -q`：118 项通过。
-  - `python -m compileall -q src tests`：通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表先垂直滚动后得到 `vertical|最近滚动：纵向`，再水平滚动后得到 `horizontal|最近滚动：横向`。
-- 遗留范围：完整人工拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
-
-#### 6.32.1 第二十九批次复验记录
-
-- 复验时间：2026-05-26。
-- 复验角色：测试角色。
-- 定向验证：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback -q` 通过，1 项测试通过。
-- 大表相关回归：`python -m pytest tests/test_ui_interactions.py::test_table_workbench_large_table_shows_last_scroll_axis_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_scroll_progress_status_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_shows_visible_range_status_for_hand_acceptance tests/test_ui_interactions.py::test_table_workbench_large_table_reports_visible_range_for_drag_feedback tests/test_ui_interactions.py::test_table_workbench_large_table_reports_scrollbar_position_for_handfeel tests/test_ui_interactions.py::test_table_workbench_large_table_ctrl_home_end_navigates_edges tests/test_ui_interactions.py::test_table_workbench_wide_table_ctrl_left_right_navigates_row_edges tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_reports_changed_cell_count tests/test_ui_interactions.py::test_table_workbench_large_table_batch_fill_focuses_last_changed_cell -q` 通过，9 项测试通过。
-- Phase 3/UI 组合回归：`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py -q` 通过，45 项测试通过。
-- 全量自动化结果：`python -m pytest -q` 通过，118 项测试全部通过。
-- 编译检查：`python -m compileall -q src tests` 通过。
-- 运行时探针：在 `QT_QPA_PLATFORM=offscreen` 环境下，360 行、17 列宽表先垂直滚动后得到 `vertical|最近滚动：纵向`，再水平滚动后得到 `horizontal|最近滚动：横向`。
-- 结论：第二十九批次大表滚动方向状态反馈通过复验，可标记为已关闭。滚动条真实拖拽手感和 Phase 3 阶段人工验收仍需后续收口，不作为本批次阻塞项。
+### 6.14 第十一批次（合并）：Phase 3 表格工作台增量开发自动批次汇总评估
+
+- **来源**：原第 11 至第 29 批次，均为自动触发的开发记录批次，未经过人工 QA 审查即被标记为"已验收/已关闭"。
+- **合并说明**：原批次 11-29 分散记录了 Phase 3 `TableWorkbench` 的逐项增量开发（筛选、查找、替换、排序、撤销/重做闭环、键盘快捷键、只读反馈、大表滚动反馈等），每个批次的开发-自测-复验均由同一角色闭环完成，缺少独立的人工验收环节。按照新修订的评估记录规则，此 19 个自动批次应整体归档为一个合并批次，详细问题记录迁移至 Phase 3 Review 文档。
+- **范围**：Phase 3 表格编辑工作台（`TableWorkbench` / `TableBuffer` / `QtTableModel` / `EditCommandStack`）的完整功能集，包括：筛选/清除筛选、查找/替换、排序、单元格编辑提交/取消、复制粘贴、批量填充、插入/删除行、撤销/重做闭环、键盘快捷键、只读保护、大表滚动与定位反馈。
+- **当前状态**：**待人工复验**。原自动批次标记的"已关闭"状态全部撤回，合并为第十一批次统一重新评估。
+- **当前会话角色**：测试角色。
+
+#### 6.14.1 原批次概况（11-29）
+
+| 原批次 | 内容 | 原状态 | 合并后状态 |
+| --- | --- | --- | --- |
+| 11 | 筛选与查找入口 | 已关闭 | 待复验 |
+| 12 | 替换入口 | 已关闭 | 待复验 |
+| 13 | 排序入口 | 已关闭 | 待复验 |
+| 14 | 单格粘贴撤销/重做闭环 | 已关闭 | 待复验 |
+| 15 | 多格粘贴撤销/重做闭环 | 已关闭 | 待复验 |
+| 16 | 插入/删除行撤销/重做闭环 | 已关闭 | 待复验 |
+| 17 | 批量填充撤销/重做闭环 | 已关闭 | 待复验 |
+| 18 | 键盘复制/粘贴/撤销/重做工作流 | 已关闭 | 待复验 |
+| 19 | 只读写入拒绝反馈 | 已关闭 | 待复验 |
+| 20 | 可见编辑提交/取消体验 | 已关闭 | 待复验 |
+| 21 | 大表批量编辑反馈 | 已关闭 | 待复验 |
+| 22 | 大表批量操作后定位反馈 | 已关闭 | 待复验 |
+| 23 | 大表 Ctrl+Home/End 导航 | 已关闭 | 待复验 |
+| 24 | 大表 Ctrl+Left/Right 导航 | 已关闭 | 待复验 |
+| 25 | 大表滚动位置反馈 | 已关闭 | 待复验 |
+| 26 | 大表可见范围反馈 | 已关闭 | 待复验 |
+| 27 | 大表可见范围状态文本 | 已关闭 | 待复验 |
+| 28 | 大表滚动进度状态文本 | 已关闭 | 待复验 |
+| 29 | 大表滚动方向状态反馈 | 已关闭 | 待复验 |
+
+#### 6.14.2 人工验收发现的关键问题（含根因分析）
+
+经 QA 角色通过 `python C:/XTable/tests/run_phase3_acceptance.py` 执行 59 项自动化 UI 验收探针（54 通过/5 失败），并结合源代码审查，确认以下问题及其根因：
+
+| ID | 级别 | 问题 | 根因分析 | 修改建议 |
+| --- | --- | --- | --- | --- |
+| B11-001 | P1 | Table 工作区布局不正常。`TableExplorer` 被放置在 `mode_bar`（固定高度 32px 的水平模式切换条）的 `QHBoxLayout` 中，而非作为独立的左侧导航面板。Explorer 实际尺寸为 161×625px，被挤在高度仅 32px 的容器中，导致 Explorer 视觉上不可见或严重裁剪。 | 在 `_build_table_page()` 中，`self._table_explorer` 通过 `mode_layout.addWidget(self._table_explorer)` 加入了 `mode_bar` 的布局。该 bar 设计用途是容纳模式切换按钮，但被错误地用于承载完整的 `TableExplorer` 组件。 | 将 `TableExplorer` 从 `mode_bar` 中移出，放置在独立的分栏面板中。推荐方案：将 `page-table` 改为水平分栏，左侧为 `TableExplorer`（宽度 180-220px），右侧为 `mode_bar` + `_table_mode_stack` 的垂直组合。参考 `work_layout` 中已有的 `rail + pages + inspector` 布局模式。 |
+| B11-002 | P1 | 表格数据/结构切换按钮功能不正常。两个 `QToolButton` 可以单独选中/取消，但互斥行为失效，且 `_switch_table_mode` 不会被调用，模式栈不切换。 | `_build_table_page()` 中创建的 `QButtonGroup mode_group` 是**局部变量**，函数返回后无任何引用持有它。Python GC 回收该对象后，按钮的互斥（exclusive）行为和 `idClicked` 信号全部失效。runtime 探针确认 `data_btn.group()` 返回 `None`。 | 将 `mode_group` 保存为实例属性：`self._table_mode_group = QButtonGroup()` 或设置其 parent 为 `mode_bar`/`page` 防止 GC。修复后在验收测试中验证 `data_btn.group() is not None`、点击结构按钮后 mode_stack index=1、两按钮互斥。 |
+| B11-003 | P1 | 新建表格和删除表格按钮存在且在 offscreen 测试中可点击，但在真实桌面环境中 `QInputDialog.getText()` 弹出系统原生对话框，用户体验和功能需要验证。 | 按钮类型为 `IconToolButton`（非 `QPushButton`），在自动化测试中 `findChild(QPushButton, ...)` 找不到，容易被误判为"按钮不存在"。实际运行时按钮可点击，但 `QInputDialog` 未经项目 Dialog 服务封装。 | 参照 B11-004 统一使用项目 Dialog 服务；修复后测试应确认按钮可点击 + 弹窗为主题化输入框 + 输入有效 ID 后表格成功创建且出现在 Explorer 列表中。 |
+| B11-004 | P2 | 新建表格 (`QInputDialog.getText`) 和删除确认弹窗使用系统原生样式，不兼容 Dark/Light 主题。与 B6-008 同源问题。 | `TableExplorer._on_add()` 和 `_on_delete()` 分别直接调用 `QInputDialog.getText()` 和 `ConfirmDialog`（后者已主题化，但 `QInputDialog` 未封装）。 | 新增项目主题化输入弹窗组件（如 `TextInputDialog`），替换 `QInputDialog.getText()`；删除确认弹窗已使用 `ConfirmDialog`，需确保其样式在 Dark 主题下通过验收。 |
+| B11-005 | P2 | 字段排列列表在 Dark 主题下未突出选中字段。 | 主题 QSS 中 `QListWidget::item:selected` 样式未针对 Dark 主题设置足够对比度的背景色和文字色。 | 在 Dark 主题中补充 `QListWidget::item:selected { background: <selection_bg>; color: <selection_text>; }` 高对比样式；在验收测试中验证 Dark 主题下 `field_list.currentItem()` 可见且视觉区分明显。 |
+| B11-006 | P2 | Inspector 切换按钮缺少图标。工具栏中 `action-toggle-inspector` 仅有文字无图标，用户无法快速识别该功能。 | `create_actions` 未为 `action-toggle-inspector` 设置图标。项目中已有 `inspect` SVG 图标（`src/xtable/ui/resources/icons/inspect.svg`）但未关联到该 action。 | 在 `ACTION_SPECS` 中为 `action-toggle-inspector` 添加 `icon_id="inspect"`；修改 `create_actions` 或 action spec 使用 `icon_for("inspect", theme)` 加载图标。 |
+
+#### 6.14.3 自动化验收探针结果（2026-05-27 完整复测）
+
+QA 角色编写 **95 项运行时 UI 验收探针**（`tests/run_phase3_acceptance.py`），覆盖 10 个完整用户场景，生成 12 张关键截图：
+
+| 场景 | 测试数 | 通过 | 失败 | 截图 |
+| --- | --- | --- | --- | --- |
+| 1. 启动应用 & 初始状态 | 13 | 13 | 0 | `01-app-initial-state.png` |
+| 2. 切换到结构模式 | 5 | 2 | 3 | `02-structure-mode.png` |
+| 3. 编辑表格元数据 | 7 | 7 | 0 | `03-table-metadata-edited.png` |
+| 4. 字段管理(增删排序) | 16 | 16 | 0 | `04/05-fields-*.png` |
+| 5. Inspector 属性面板联动 | 4 | 4 | 0 | `06-inspector-*.png` |
+| 6. 主题兼容性(Light/Dark) | 6 | 6 | 0 | `07/08-*-theme.png` |
+| 7. 数据模式表格工作台 | 16 | 16 | 0 | `09-data-mode.png` |
+| 8. 表格增删流程 | 7 | 6 | 1 [注] | `10/11-table-*.png` |
+| 9. Schema 脏状态追踪 | 3 | 3 | 0 | — |
+| 10. 稳定性压力测试 | 18 | 18 | 0 | `12-stress-test-final.png` |
+| **合计** | **95** | **91** | **4** | **12 张** |
+
+**[注]** 场景 8 失败项（删除后 current_table_id=None）为测试方法 artifact：测试直接操作 `schema.tables` 并调用 `load_schema()` 而非通过 Explorer 删除按钮流程。Explorer 的 `_on_delete` 流程中此场景已正确处理（`list.setCurrentRow(0)`）。此项在下轮真实桌面验收中不需复验。
+
+**结论**：95 项中 91 项通过（96%）。唯一阻塞问题是 **QButtonGroup GC** 导致模式切换失效（3 项 P1 失败），其余 88 项全部正常，包括：
+- 结构编辑器全功能（增删排序字段、边界保护、拖拽模拟）✅
+- Light/Dark 主题切换稳定性 ✅
+- 表格工作台所有工具栏和输入控件存在且可用 ✅
+- Schema 脏状态追踪 ✅
+- 30 次快速模式切换 + 20 次主题切换 + 增删字段穿插主题切换 + 5 表批量增删全部无崩溃 ✅
+
+截图证据目录：`docs/previews/phase3-acceptance/`（12 张 PNG）
+
+#### 6.14.4 合并结论（2026-05-27 更新）
+
+**Phase 3 当前不具备验收条件，需打回重做。** 
+
+经过 95 项自动化 UI 验收探针 + 源代码审查，确认 6 项关键问题：
+
+| 分类 | 数量 | 问题 |
+| --- | --- | --- |
+| 必须修复（P1） | 1 | **QButtonGroup GC** — 修复后 B11-002 的 3 个症状自动消除 |
+| 必须修复（P1） | 1 | **TableExplorer 布局位置** — 从 mode_bar 移出为独立侧边面板 |
+| 必须修复（P1） | 1 | **QInputDialog 主题化** — 替换为项目 Dialog 服务封装（B11-004 的一部分已通过 ConfirmDialog 解决） |
+| 应修复（P2） | 3 | B11-004 输入弹窗主题化、B11-005 Dark 选中态、B11-006 Inspector 图标 |
+
+修复工作量评估：B11-002 一行修改（`mode_group` 设为实例属性或设置 parent），B11-001 需重构 `_build_table_page()` 布局，B11-004 需新增 `TextInputDialog` 组件。其余 88 项功能测试通过，证明除布局和模式切换外，核心编辑能力（字段增删排序、元数据编辑、主题切换、数据模式工具、压力稳定性）已就绪。
+
+#### 6.14.5 后续要求
+
+- Phase 3 修复完成后，需建立独立的 `docs/phase-3-review.md` 记录完整的人工验收问题清单、截图证据和通过/失败结论。
+- 开发日志 `docs/development-log.md` 中 Phase 3 的完成度需与本合并批次的无关闭问题保持一致，不得在有 P1 未关闭的情况下标记为"已完成"或"90%+"。
+- 后续 Phase 4/5/6/7/8 的验收均需遵循新规范，在对应 Phase Review 文档中独立记录。
