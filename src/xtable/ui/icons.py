@@ -29,6 +29,12 @@ ICON_IDS = {
     "warn",
     "error",
     "info",
+    "add",
+    "remove",
+    "arrow-up",
+    "arrow-down",
+    "structure",
+    "inspect",
 }
 
 THEME_ICON_COLORS = {
@@ -70,6 +76,12 @@ ICON_SVG = {
     "warn": '<path d="M12 4l9 16H3z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
     "error": '<path d="M6 6l12 12M18 6L6 18"/>',
     "info": '<path d="M12 17v-6"/><path d="M12 7h.01"/><circle cx="12" cy="12" r="9"/>',
+    "add": '<path d="M12 5v14M5 12h14"/>',
+    "remove": '<path d="M5 12h14"/>',
+    "arrow-up": '<path d="M12 5l6 7H6z"/><path d="M12 19V5"/>',
+    "arrow-down": '<path d="M12 19l6-7H6z"/><path d="M12 5v14"/>',
+    "structure": '<path d="M4 5h16v4H4z"/><path d="M4 11h12v4H4z"/><path d="M4 17h14v4H4z"/>',
+    "inspect": '<path d="M14 3v5h5"/><path d="M6 21h12a2 2 0 0 0 2-2V8l-5-5H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"/><circle cx="11" cy="14" r="3"/><path d="M13 15.5l2.5 2.5"/>',
 }
 
 ICON_TONES = {

@@ -395,4 +395,61 @@ def build_stylesheet(theme: str) -> str:
     QPushButton:disabled {{
         color: {tokens["disabled_text"]};
     }}
+    QFrame#structure-editor {{
+        background: {tokens["panel_bg"]};
+        border-left: 1px solid {tokens["border"]};
+    }}
+    QFrame#table-explorer {{
+        background: {tokens["panel_bg"]};
+        border-right: 1px solid {tokens["border"]};
+        min-width: 160px;
+        max-width: 300px;
+    }}
+    QFrame#table-mode-bar {{
+        background: {tokens["toolbar_bg"]};
+        border-bottom: 1px solid {tokens["border"]};
+    }}
+    QFrame#inspector-panel {{
+        background: {tokens["panel_bg"]};
+        border-left: 1px solid {tokens["border"]};
+    }}
+    QLabel#inspector-panel-title {{
+        color: {tokens["text"]};
+        font-weight: 600;
+        background: {tokens["toolbar_bg"]};
+        border-bottom: 1px solid {tokens["border"]};
+        padding: 0 12px;
+    }}
+    QLabel#inspector-panel-empty {{
+        color: {tokens["muted"]};
+    }}
+    QLabel#table-explorer-header, QLabel#structure-editor-params-label {{
+        color: {tokens["text"]};
+        font-weight: 600;
+        padding: 2px 0;
+    }}
+    QToolButton#table-mode-data-button, QToolButton#table-mode-structure-button {{
+        background: transparent;
+        border: 1px solid transparent;
+        border-radius: 3px;
+        padding: 2px 10px;
+        color: {tokens["text"]};
+        font-size: 12px;
+    }}
+    QToolButton#table-mode-data-button:hover, QToolButton#table-mode-structure-button:hover {{
+        background: {tokens["hover_bg"]};
+        border-color: {tokens["border"]};
+    }}
+    QToolButton#table-mode-data-button:checked, QToolButton#table-mode-structure-button:checked {{
+        background: {tokens["active_bg"]};
+        border-color: {tokens["accent"]};
+        color: {tokens["accent"]};
+    }}
+    QListWidget#table-explorer-list, QListWidget#structure-editor-field-list {{
+        color: {tokens["text"]};
+        background: {tokens["workspace_bg"]};
+        border: 1px solid {tokens["border"]};
+        selection-background-color: {tokens["selection_bg"]};
+        selection-color: {tokens["selection_text"]};
+    }}
     """
