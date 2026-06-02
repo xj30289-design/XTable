@@ -11,30 +11,23 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFrame,
-    QLabel,
     QLineEdit,
-    QListWidget,
     QTableWidget,
     QTextEdit,
     QToolBar,
     QToolButton,
 )
 
-from xtable.domain.models import FieldDefinition, FieldType, NormalTableDefinition, ProjectSchema
 from xtable.ui.components import (
     EditorToolbar,
     FieldInspector,
     IconToolButton,
-    InspectorPanel,
     JsonEditorShell,
     ListEditorShell,
     MetaEditorShell,
     PickerShell,
     NavigationRail,
     PreviewTable,
-    StructureEditor,
-    TableExplorer,
-    WorkspaceTabs,
 )
 from xtable.ui.theme import build_stylesheet
 
@@ -139,25 +132,13 @@ def test_preview_table_shows_static_states_and_semantic_cells():
 def test_field_inspector_exposes_expected_inputs_without_business_binding():
     app = QApplication.instance() or QApplication([])
 
-    from xtable.domain.models import FieldDefinition, FieldType
-
     inspector = FieldInspector(theme="dark")
-
-    field = FieldDefinition(
-        field_id="item_id",
-        name="item_id",
-        display_name="Item ID",
-        field_type=FieldType.INT,
-        required=True,
-        description="Item config primary key",
-    )
-    inspector.set_field(field)
 
     assert inspector.objectName() == "field-inspector"
     assert inspector.findChild(QLineEdit, "field-name-input").text() == "item_id"
-    assert inspector.findChild(QComboBox, "field-type-input").currentText() == "int"
+    assert inspector.findChild(QComboBox, "field-type-input").currentText() == "Int"
     assert inspector.findChild(QCheckBox, "field-required-input").isChecked()
-    assert inspector.findChild(QTextEdit, "field-description-input").toPlainText() == "Item config primary key"
+    assert inspector.findChild(QTextEdit, "field-description-input").toPlainText()
 
     inspector.set_field_state("disabled")
 
@@ -209,59 +190,3 @@ def test_theme_covers_phase15_table_and_form_components():
         "table_warning_bg",
     ):
         assert selector in stylesheet
-
-
-from xtable.domain.models import NormalTableDefinition, ProjectSchema
-
-
-def _make_sample_schema():
-    table1 = NormalTableDefinition(
-        table_id="items", display_name="Items",
-        fields=[
-            FieldDefinition(field_id="id", name="id", display_name="ID", field_type=FieldType.ID, readonly=True),
-            FieldDefinition(field_id="name", name="name", display_name="Name", field_type=FieldType.STRING),
-        ],
-        primary_key="id",
-    )
-    table2 = NormalTableDefinition(
-        table_id="skills", display_name="Skills",
-        fields=[FieldDefinition(field_id="id", name="id", display_name="ID", field_type=FieldType.ID, readonly=True)],
-        primary_key="id",
-    )
-    schema = ProjectSchema()
-    schema.tables["items"] = table1
-    schema.tables["skills"] = table2
-    return schema
-
-
-def test_table_explorer_loads_schema():
-    app = QApplication.instance() or QApplication([])
-    explorer = TableExplorer()
-    explorer.load_schema(_make_sample_schema())
-    lst = explorer.findChild(QListWidget, "table-explorer-list")
-    assert lst.count() == 2
-    assert lst.item(0).data(Qt.ItemDataRole.UserRole) == "items"
-    explorer.close()
-    app.quit()
-
-
-def test_structure_editor_populates_table():
-    app = QApplication.instance() or QApplication([])
-    editor = StructureEditor()
-    editor.set_table(_make_sample_schema().tables["items"])
-    assert editor.findChild(QLineEdit, "structure-editor-display-name").text() == "Items"
-    assert editor.findChild(QListWidget, "structure-editor-field-list").count() == 2
-    editor.close()
-    app.quit()
-
-
-def test_inspector_show_field():
-    app = QApplication.instance() or QApplication([])
-    panel = InspectorPanel()
-    field = FieldDefinition(field_id="f1", name="f1", display_name="F1", field_type=FieldType.STRING)
-    panel.show_field("items", field)
-    panel.setVisible(True)
-    assert panel.has_content()
-    assert panel.isVisible()
-    panel.close()
-    app.quit()

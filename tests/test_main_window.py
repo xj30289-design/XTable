@@ -71,10 +71,6 @@ class FakeProjectService:
         assert project is self.project
         return project
 
-    def load_schema(self, project):
-        from xtable.domain.models import ProjectSchema
-        return ProjectSchema()
-
 
 def test_main_window_exposes_phase_one_project_actions():
     app = QApplication.instance() or QApplication([])

@@ -11,13 +11,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from xtable.domain.models import ProjectSchema
 from xtable.domain.project import Project, ProjectSettings
-from xtable.domain.serialization import project_schema_from_dict, project_schema_to_dict
 
 
 CONFIG_FILE_NAME = "xtable.project.json"
-SCHEMA_FILE_NAME = "schema.json"
 PROJECT_DIRECTORIES = (
     "tables",
     "rules",
@@ -212,57 +209,6 @@ class ProjectService:
         self.recent_projects.record(project)
         return project
 
-    def schema_path(self, project: Project) -> Path:
-        settings_dir = str(project.settings.paths.get("settings_dir", "settings"))
-        return project.root / settings_dir / SCHEMA_FILE_NAME
-
-    def load_schema(self, project: Project) -> ProjectSchema:
-        schema_path = self.schema_path(project)
-        if not schema_path.exists():
-            project.schema_digest = ""
-            return ProjectSchema()
-        try:
-            data = json.loads(schema_path.read_text(encoding="utf-8"))
-            schema = project_schema_from_dict(data)
-        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError) as error:
-            raise ProjectFileError(
-                f"Project schema is invalid: {schema_path}",
-                FileFailureKind.INVALID_CONFIG,
-            ) from error
-        project.schema_digest = self._file_digest(schema_path)
-        return schema
-
-    def save_schema(self, project: Project, schema: ProjectSchema) -> Project:
-        schema_path = self.schema_path(project)
-        if schema_path.exists():
-            if not self._has_owner_write_bit(schema_path):
-                raise ProjectConflictError(
-                    f"Project schema is read-only: {schema_path}",
-                    FileFailureKind.READ_ONLY,
-                )
-            current_digest = self._file_digest(schema_path)
-            if not project.schema_digest:
-                raise ProjectConflictError(
-                    f"Project schema must be loaded before saving: {schema_path}",
-                    FileFailureKind.EXTERNALLY_MODIFIED,
-                )
-            if current_digest != project.schema_digest:
-                raise ProjectConflictError(
-                    f"Project schema changed outside XTable: {schema_path}",
-                    FileFailureKind.EXTERNALLY_MODIFIED,
-                )
-
-        try:
-            schema.validate_structure()
-            self._write_json_atomic(schema_path, project_schema_to_dict(schema))
-        except OSError as error:
-            raise ProjectConflictError(
-                f"Project schema could not be saved: {schema_path}",
-                self._classify_os_error(error),
-            ) from error
-        project.schema_digest = self._file_digest(schema_path)
-        return project
-
     def _read_config(self, path: Path) -> ProjectSettings:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -343,21 +289,6 @@ class ProjectService:
         if isinstance(error, PermissionError):
             return FileFailureKind.LOCKED
         return FileFailureKind.WRITE_FAILED
-
-    def _write_json_atomic(self, path: Path, payload: dict[str, Any]) -> None:
-        temp_path = path.with_name(f".{path.name}.tmp")
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            data = json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
-            with temp_path.open("w", encoding="utf-8") as handle:
-                handle.write(data)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temp_path, path)
-            self._fsync_directory(path.parent)
-        finally:
-            if temp_path.exists():
-                temp_path.unlink()
 
     def _fsync_directory(self, path: Path) -> None:
         try:

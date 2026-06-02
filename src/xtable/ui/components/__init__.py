@@ -9,11 +9,8 @@ from xtable.ui.components.inspector import (
     MetaEditorShell,
     PickerShell,
 )
-from xtable.ui.components.inspector_panel import InspectorPanel
 from xtable.ui.components.navigation import NavigationRail
-from xtable.ui.components.structure_editor import StructureEditor
-from xtable.ui.components.table_explorer import TableExplorer
-from xtable.ui.components.tables import PreviewTable, TableWorkbench
+from xtable.ui.components.tables import PreviewTable
 from xtable.ui.components.toolbar import EditorToolbar
 from xtable.ui.components.workspace import WorkspaceTabs
 
@@ -22,15 +19,11 @@ __all__ = [
     "EditorToolbar",
     "FieldInspector",
     "IconToolButton",
-    "InspectorPanel",
     "JsonEditorShell",
     "ListEditorShell",
     "MetaEditorShell",
     "NavigationRail",
     "PickerShell",
     "PreviewTable",
-    "StructureEditor",
-    "TableExplorer",
-    "TableWorkbench",
     "WorkspaceTabs",
 ]

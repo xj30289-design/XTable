@@ -15,8 +15,6 @@
 - 阶段进入“已完成”前，必须确认本文档中该阶段的 `P1` 问题已关闭；遗留 `P2/P3` 必须写明接受原因和后续处理阶段。
 - 开发日志中的阶段进度和验收完整度必须与本文档中的未关闭问题保持一致。
 - 当前会话角色为测试角色时，只能评估、找 bug、复验、验收和更新文档，不得直接修改实现代码、测试代码或资源文件；角色按会话区分，边界以 [项目角色协作规范](./project-role-guidelines.md) 为准。
-- 每个 Phase 的正式验收评估需建立独立的 Phase Review 文档（`docs/phase-N-review.md`），本文档仅保留各 Phase 的概要审核结论和批次归档索引，详细问题记录迁移至对应 Phase Review 文档。
-- 自动触发的开发批次如未经过人工 QA 审查，不得标记为"已验收"或"已关闭"。此类批次应在对应 Phase Review 文档中进行统一人工复核，整体归档为一个合并批次，替换原有分散的开发记录批次。
 
 ## 2. 状态枚举
 
@@ -65,7 +63,6 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 | --- | --- | --- | --- | --- | --- |
 | X-001 | P2 | 自动化测试通过，但测试内容主要是 smoke 和服务 happy path，缺少对验收标准的系统映射。 | 阶段“测试通过”容易被误解为“验收通过”。 | 后续每个阶段至少建立一组与开发计划验收标准一一对应的测试或人工验收清单。 | 已关闭 |
 | X-002 | P2 | 当前不是 Git 仓库，无法通过 commit 历史追踪阶段变更。 | 与开发计划中“文档更新不得替代 Git commit message”的规范存在执行缺口。 | 初始化版本管理或在进入正式开发分支前明确外部版本管理方式。 | 已关闭 |
-| X-003 | P2 | 全量回归中 `test_preview_table_supports_clipboard_copy_paste_shortcuts` 失败，测试环境里 `QApplication.clipboard().setText("X\tY")` 后读回为空，导致 `PreviewTable` 快捷键粘贴未写入单元格。 | 全量测试不能作为绿色基线；虽然不影响 Phase 2 Schema 持久化复验结论，但会影响后续 UI Kit/表格编辑能力的持续验收。 | 已复验：当前全量 `python -m pytest` 87 项通过，剪贴板快捷键定向测试通过。后续如在 CI 或无桌面环境复现，再按环境稳定性问题重新打开。 | 已关闭 |
 
 ## 6. 批次归档
 
@@ -421,20 +418,20 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 
 - 来源：Phase 2 首批开发质量审查。
 - 范围：`Table`、`Field`、`Enum`、`Meta`、`ProjectSchema`、字段/表格类型注册表、结构一致性校验和测试覆盖。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话负责复验第八批次 Phase 2 模型结构校验修复，不修改实现代码。
-- 验证结果：`python -m pytest` 通过，72 项测试全部通过；`python -m compileall -q src tests` 通过；独立结构探针覆盖 B8-001 至 B8-006 的非法结构拦截场景，均得到预期结构错误。
-- 总体结论：第八批次结构校验修复通过复验，`ProjectSchema`、`FieldDefinition`、Enum、Meta、Table 和 Row 的结构级非法状态已能在模型层拦截。Phase 2 仍处于进行中，复杂规则、范围、唯一性、Json 内容等诊断能力继续归属 Phase 4。
+- 当前状态：已完成开发修复，等待复验。
+- 当前会话角色：开发角色。当前会话负责按第八批次修改建议补齐模型结构校验和回归测试。
+- 验证结果：`python -m pytest` 通过，66 项测试全部通过；`python -m compileall -q src tests` 通过；额外结构探针测试暴露 6 类非法模型可被注册的问题。
+- 总体结论：Phase 2 当前是“核心数据模型骨架可用”，但不能按“核心数据模型完成”验收。主要风险是 `ProjectSchema` 可以进入非法结构状态，后续 Phase 3/4 会被迫处理脏模型。
 
 | ID | 阶段 | 级别 | 问题 | 原因分析 | 影响 | 完整修改建议 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| B8-001 | Phase 2 | P1 | `ProjectSchema.add_table()` 不校验字段引用目标是否存在。 | 当前只检查重复 `table_id` 和表内字段唯一性；`ENUM` 字段可以引用不存在的 `enum_id`，`REFERENCE` 字段可以引用不存在的 `target_table_id/target_field_id`，`META` 字段可以引用不存在的 `meta_id`。 | 非法 schema 可以进入项目模型，直到运行期调用 `resolve_field_reference()` 或后续 UI/表格模型使用时才暴露 `KeyError`，会把结构错误推迟到 Phase 3/4。 | 在模型层增加结构级引用校验。`add_table()` 或统一 `validate_structure()` 必须检查字段类型与参数匹配：`ENUM` 必须引用已注册 Enum，`REFERENCE` 必须引用已注册 Table 和目标字段，`META` 必须引用已注册 Meta；缺失时抛出明确结构错误。 | 已关闭 |
-| B8-002 | Phase 2 | P1 | 表格主键、特征键和表格类型专属参数未校验。 | `primary_key`、`feature_keys`、`GroupTableDefinition.group_key`、`MatrixTableDefinition.x_axis/y_axis/value_field` 只是字符串字段，没有确认是否属于当前表字段，也没有检查二维表三轴是否重复或为空。 | 普通表、分组表和二维表虽然能用统一模型表达，但表达结果可能无效；后续排序、引用预览、分组视图和二维表展开会缺少可信前提。 | 增加表结构校验：普通表主键/特征键必须存在于字段列表；分组表 `group_key` 必须存在；二维表 `x_axis/y_axis/value_field` 必须存在且语义不冲突；对表格类型注册表中的 `required_parameters` 建立自动校验或显式校验方法。 | 已关闭 |
-| B8-003 | Phase 2 | P1 | Enum 结构规则未完整落地。 | `add_enum()` 只检查重复 `enum_id` 和重复 `item_id`，没有检查重复 `export_value`、`default_item_id` 是否存在、默认项是否废弃。 | 与枚举规格不一致；导出值重复会导致运行时配置歧义，默认项不存在会导致新增行默认值无法稳定生成。 | `add_enum()` 或 `EnumDefinition.validate()` 增加：`export_value` 默认不得重复；`default_item_id` 非空时必须存在；默认项不得为 deprecated；错误信息需要包含 enum_id 和冲突项，方便 UI 定位。 | 已关闭 |
-| B8-004 | Phase 2 | P1 | Meta 子字段重复名称未校验。 | `add_meta()` 只检查重复 `field_id`，未检查重复 `name`；Table 字段有 `field_names` 唯一检查，但 Meta 未复用同等规则。 | 违反 Meta 子字段与 Table 字段复用同一字段定义能力的规格；导出、复制粘贴和属性面板按字段名访问时会出现歧义。 | 抽出通用字段集合校验函数，同时用于 Table 和 Meta：校验 `field_id`、`name` 唯一，并为 Meta 子字段复用字段类型参数校验。 | 已关闭 |
-| B8-005 | Phase 2 | P2 | `TableRow` 没有结构约束，非法行数据可进入模型。 | `TableRow.values` 是自由 `dict[str, Any]`，`add_table()` 不检查未知字段、缺少必填字段、明显类型不匹配或只读字段写入来源。 | Phase 2 虽不负责完整业务校验，但核心数据模型无法保证行数据至少匹配表结构；后续编辑、保存、导入导出会面对不可信数据。 | 明确 Phase 2 与 Phase 4 边界：Phase 2 至少提供行结构校验入口，检查未知字段、字段名/字段 id 映射、必填字段缺失和基础类型大类；Phase 4 再负责复杂规则、范围、唯一性、Json 内容等诊断报告。 | 已关闭 |
-| B8-006 | Phase 2 | P2 | 字段类型参数缺少按类型的契约校验。 | `FieldDefinition` 同时承载 `enum_id`、`target_table_id`、`target_field_id`、`element_type`、`meta_id` 等参数，但没有根据 `field_type` 判断哪些必填、哪些禁止或哪些组合有效。 | 字段定义会出现“类型是 list 但没有 element_type”“类型是 enum 但 enum_id 为空”“基础类型却携带引用参数”等不一致状态，增加 UI 和导入导出分支复杂度。 | 增加 `FieldDefinition.validate_shape()` 或注册表驱动的字段参数校验：基础类型不应携带引用参数；Enum/Reference/List/Meta 必须具备对应参数；Json 字段保留 Json 规则参数扩展点。 | 已关闭 |
-| B8-007 | Phase 2 | P2 | 测试覆盖偏 happy path，不能证明模型层结构质量。 | `tests/test_phase2_domain_models.py` 主要验证可注册、可解析、重复 ID 拒绝和 Qt 隔离；缺少非法引用、非法表参数、Enum 导出值重复、Meta 字段名重复、行结构错误等失败用例。 | 自动化测试通过容易被误解为 Phase 2 可验收；实际模型层仍能接受多类非法结构。 | 将本批次探针场景加入回归测试：缺失 Enum/Meta/Table 引用、缺失主键/分组键/二维轴字段、重复 `export_value`、默认枚举项不存在、Meta 字段名重复、未知行字段和必填缺失。 | 已关闭 |
+| B8-001 | Phase 2 | P1 | `ProjectSchema.add_table()` 不校验字段引用目标是否存在。 | 当前只检查重复 `table_id` 和表内字段唯一性；`ENUM` 字段可以引用不存在的 `enum_id`，`REFERENCE` 字段可以引用不存在的 `target_table_id/target_field_id`，`META` 字段可以引用不存在的 `meta_id`。 | 非法 schema 可以进入项目模型，直到运行期调用 `resolve_field_reference()` 或后续 UI/表格模型使用时才暴露 `KeyError`，会把结构错误推迟到 Phase 3/4。 | 在模型层增加结构级引用校验。`add_table()` 或统一 `validate_structure()` 必须检查字段类型与参数匹配：`ENUM` 必须引用已注册 Enum，`REFERENCE` 必须引用已注册 Table 和目标字段，`META` 必须引用已注册 Meta；缺失时抛出明确结构错误。 | 待复验 |
+| B8-002 | Phase 2 | P1 | 表格主键、特征键和表格类型专属参数未校验。 | `primary_key`、`feature_keys`、`GroupTableDefinition.group_key`、`MatrixTableDefinition.x_axis/y_axis/value_field` 只是字符串字段，没有确认是否属于当前表字段，也没有检查二维表三轴是否重复或为空。 | 普通表、分组表和二维表虽然能用统一模型表达，但表达结果可能无效；后续排序、引用预览、分组视图和二维表展开会缺少可信前提。 | 增加表结构校验：普通表主键/特征键必须存在于字段列表；分组表 `group_key` 必须存在；二维表 `x_axis/y_axis/value_field` 必须存在且语义不冲突；对表格类型注册表中的 `required_parameters` 建立自动校验或显式校验方法。 | 待复验 |
+| B8-003 | Phase 2 | P1 | Enum 结构规则未完整落地。 | `add_enum()` 只检查重复 `enum_id` 和重复 `item_id`，没有检查重复 `export_value`、`default_item_id` 是否存在、默认项是否废弃。 | 与枚举规格不一致；导出值重复会导致运行时配置歧义，默认项不存在会导致新增行默认值无法稳定生成。 | `add_enum()` 或 `EnumDefinition.validate()` 增加：`export_value` 默认不得重复；`default_item_id` 非空时必须存在；默认项不得为 deprecated；错误信息需要包含 enum_id 和冲突项，方便 UI 定位。 | 待复验 |
+| B8-004 | Phase 2 | P1 | Meta 子字段重复名称未校验。 | `add_meta()` 只检查重复 `field_id`，未检查重复 `name`；Table 字段有 `field_names` 唯一检查，但 Meta 未复用同等规则。 | 违反 Meta 子字段与 Table 字段复用同一字段定义能力的规格；导出、复制粘贴和属性面板按字段名访问时会出现歧义。 | 抽出通用字段集合校验函数，同时用于 Table 和 Meta：校验 `field_id`、`name` 唯一，并为 Meta 子字段复用字段类型参数校验。 | 待复验 |
+| B8-005 | Phase 2 | P2 | `TableRow` 没有结构约束，非法行数据可进入模型。 | `TableRow.values` 是自由 `dict[str, Any]`，`add_table()` 不检查未知字段、缺少必填字段、明显类型不匹配或只读字段写入来源。 | Phase 2 虽不负责完整业务校验，但核心数据模型无法保证行数据至少匹配表结构；后续编辑、保存、导入导出会面对不可信数据。 | 明确 Phase 2 与 Phase 4 边界：Phase 2 至少提供行结构校验入口，检查未知字段、字段名/字段 id 映射、必填字段缺失和基础类型大类；Phase 4 再负责复杂规则、范围、唯一性、Json 内容等诊断报告。 | 待复验 |
+| B8-006 | Phase 2 | P2 | 字段类型参数缺少按类型的契约校验。 | `FieldDefinition` 同时承载 `enum_id`、`target_table_id`、`target_field_id`、`element_type`、`meta_id` 等参数，但没有根据 `field_type` 判断哪些必填、哪些禁止或哪些组合有效。 | 字段定义会出现“类型是 list 但没有 element_type”“类型是 enum 但 enum_id 为空”“基础类型却携带引用参数”等不一致状态，增加 UI 和导入导出分支复杂度。 | 增加 `FieldDefinition.validate_shape()` 或注册表驱动的字段参数校验：基础类型不应携带引用参数；Enum/Reference/List/Meta 必须具备对应参数；Json 字段保留 Json 规则参数扩展点。 | 待复验 |
+| B8-007 | Phase 2 | P2 | 测试覆盖偏 happy path，不能证明模型层结构质量。 | `tests/test_phase2_domain_models.py` 主要验证可注册、可解析、重复 ID 拒绝和 Qt 隔离；缺少非法引用、非法表参数、Enum 导出值重复、Meta 字段名重复、行结构错误等失败用例。 | 自动化测试通过容易被误解为 Phase 2 可验收；实际模型层仍能接受多类非法结构。 | 将本批次探针场景加入回归测试：缺失 Enum/Meta/Table 引用、缺失主键/分组键/二维轴字段、重复 `export_value`、默认枚举项不存在、Meta 字段名重复、未知行字段和必填缺失。 | 待复验 |
 
 #### 6.10.1 第八批次修复记录
 
@@ -446,160 +443,3 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 - 行结构：`add_table()` 已校验未知行字段、必填字段缺失和基础类型大类错误；复杂范围、唯一性、Json 内容等仍保留给 Phase 4 诊断规则。
 - 字段契约：新增 `FieldDefinition.validate_shape()`，按 `field_type` 校验 enum/reference/list/meta 必需参数，并禁止基础类型携带引用参数。
 - 回归测试：`tests/test_phase2_domain_models.py` 已增加第八批探针场景，覆盖非法引用、非法表参数、Enum/Meta 结构、行结构和字段参数错配。
-
-#### 6.10.2 第八批次复验记录
-
-- 复验时间：2026-05-25。
-- 复验角色：测试角色。
-- 自动化复验证据：`python -m pytest` 通过，72 项测试全部通过；`python -m compileall -q src tests` 通过。
-- 独立探针复验证据：额外运行结构探针，覆盖缺失 Enum 引用、Meta 内缺失 Table 引用、缺失主键字段、二维表轴重复、Enum 导出值重复、默认枚举项废弃、Meta 字段名重复、未知行字段、必填字段缺失、基础类型错误、列表缺失元素类型、基础字段携带非法引用参数等场景，均得到预期 `ValueError`。
-- 结论：第八批次整改通过复验，`B8-001` 至 `B8-007` 全部关闭。Phase 2 可继续推进后续核心数据模型能力，但不代表 Phase 2 全阶段完成。
-
-### 6.11 第九批次：Phase 2 Schema 持久化验收评估
-
-- 来源：Phase 2 Schema 持久化新增开发内容验收。
-- 范围：`xtable.domain.serialization`、`ProjectSchema` 引用图和循环检测、`ProjectService` schema 保存/加载、`Project.schema_digest` 外部修改检测、相关自动化测试。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和问题归档，不修改实现代码或测试代码。
-- 自动化结果：`python -m pytest tests/test_project_files.py::test_project_service_rejects_schema_save_without_loaded_digest_when_file_exists -v` 通过，1 项测试通过；`python -m pytest tests/test_phase2_domain_models.py tests/test_phase2_schema_serialization.py tests/test_project_files.py -v` 通过，34 项 Phase 2 相关测试全部通过；`python -m compileall -q src tests` 通过。第九批次复验时曾发现跨阶段 UI 剪贴板测试失败并记录为 `X-003`，该问题已在后续 Phase 2 整体验收中复验关闭。
-- 通过项：schema 字典往返、未知字段/表格类型拒绝、格式版本拒绝、Meta 循环阻塞、Table 引用循环发现但不阻塞、schema 文件保存加载、缺失 schema 返回空结构、已加载 schema 的外部修改冲突检测均通过。
-- 复验通过项：已有 schema 文件在未先调用 `load_schema()` 初始化 `schema_digest` 的情况下，`save_schema()` 已拒绝覆盖现有 `settings/schema.json`，并返回外部修改冲突。
-
-| ID | 阶段 | 级别 | 问题 | 原因分析 | 影响 | 完整修改建议 | 状态 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| B9-001 | Phase 2 | P1 | `ProjectService.save_schema()` 在 schema 文件已存在但 `project.schema_digest` 为空时允许覆盖。 | 当前保存逻辑只在 `project.schema_digest` 非空且当前文件 digest 不一致时拒绝保存；如果用户打开已有项目后未先调用 `load_schema()`，`open_project()` 返回的 `Project.schema_digest` 仍为空，随后 `save_schema()` 会把已有 schema 当成首次保存覆盖。 | 可能导致已有 `settings/schema.json` 被空 schema 或过期内存 schema 静默覆盖，破坏 schema 持久化的数据安全边界，也削弱“外部修改检测”的可信度。 | 已修复：当 schema 文件已存在且 `project.schema_digest` 为空时，`save_schema()` 拒绝保存并提示必须先加载 schema；回归测试已覆盖“已有 schema 文件 + 未 load_schema + save_schema”必须拒绝覆盖。 | 已关闭 |
-
-#### 6.11.1 第九批次验收探针记录
-
-- 探针 1：创建项目并保存包含 `items` 表的 schema 后，重新 `open_project()`，不调用 `load_schema()`，直接以空 `ProjectSchema` 调用 `save_schema()`。结果：抛出 `ProjectConflictError`，错误类型为 `EXTERNALLY_MODIFIED`，`settings/schema.json` 内容保持不变，判定为通过。
-- 探针 2：三表引用环 `a -> b -> c -> a` 可通过 `table_reference_graph()` 和 `find_table_reference_cycles()` 发现，返回 `(("a", "b", "c", "a"),)`，符合预期。
-- 结论：第九批次整改通过复验，`B9-001` 已关闭。Phase 2 Schema 持久化能力通过当前自动化和运行时探针验收；第九批次复验期间发现的跨阶段 UI 剪贴板问题已在 `X-003` 中关闭。
-
-### 6.12 Phase 2：核心数据模型整体验收评估
-
-- 来源：Phase 2 剩余开发清单测试验收。
-- 范围：引用索引与依赖查询、字段默认值与新增行模板、结构变更影响检查、模型复制派生、schema 格式迁移、Phase 2 验收映射清单。
-- 当前状态：测试验收通过。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和文档更新，不修改实现代码或测试代码。
-- 自动化结果：`python -m pytest tests/test_phase2_domain_models.py tests/test_phase2_schema_serialization.py tests/test_project_files.py -v` 通过，39 项 Phase 2 相关测试全部通过；`python -m pytest` 通过，87 项全量测试全部通过；`python -m compileall -q src tests` 通过。
-- 定向复验：新增 5 项核心能力测试通过，覆盖引用索引、默认值/新行模板、结构变更影响、模型复制与引用重定向、schema 旧格式迁移。
-- 运行时探针：独立构造 Enum、Meta、普通表和引用表后，`references_to_enum()`、`references_to_meta()`、`references_to_table()`、`references_to_field()`、`create_empty_row()`、`deletion_impact()`、`copy_table()` 均返回预期结果。
-- 结论：Phase 2 当前开发清单已达到进入 Phase 3 表格编辑工作台的条件。复杂业务校验、范围/唯一性诊断、Json 内容校验、导入导出阻塞和 UI 真实编辑工作流继续归属 Phase 3/4/5，不作为 Phase 2 阻塞项。
-
-### 6.13 第十批次：Phase 3 表格工作台首批能力评估
-
-- 来源：Phase 3 首批 `xtable.table_engine` 表格模型适配层开发后测试与人工可测性评估。
-- 范围：`TableBuffer`、`QtTableModel`、单元格编辑、复制粘贴、插入删除、单元格状态映射、撤销重做命令栈、Phase 3 UI 操作测试入口。
-- 当前状态：复验通过，已关闭。
-- 当前会话角色：测试角色。本次会话只执行评估、验收和问题归档，不修改实现代码或测试代码。
-- 自动化结果：`python -m pytest -q` 通过，97 项测试全部通过；`python -m compileall -q src tests` 通过；`python -m pytest tests/test_table_engine.py tests/test_ui_demo.py tests/test_ui_interactions.py::test_demo_wires_focus_manager_page_blur_display_modes_and_visible_editing_tools -q` 通过，16 项定向测试全部通过。
-- 运行时探针：整数列 `count` 原值为 `int 10`，通过 `TableBuffer.paste_tsv(0, 2, "99")` 粘贴后保持 `int 99`；继续粘贴非法整数会被拒绝，原值保持不变并设置 `CellState("error")`；随后 `ProjectSchema.validate_structure()` 通过。
-- 信号探针：通过 `QtTableModel.set_cell_state()` 设置单元格错误状态后，`QSignalSpy(model.dataChanged).count()` 为 1；通过 `EditCommandStack` 执行编辑、撤销、重做后，`dataChanged` 信号计数为 3。
-
-| ID | 阶段 | 级别 | 问题 | 原因分析 | 影响 | 完整修改建议 | 状态 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| B10-001 | Phase 3 | P1 | 缺少可见表格工作台 UI，用户无法进行操作测试。 | 当前 Phase 3 首批只实现 `table_engine` 模型层，尚未在 `EditorShell`、Demo 或主窗口中接入真实 `QTableView + QtTableModel` 页面；Phase 3 人工验收清单仍为未开始。 | 用户无法测试“看见表格、选中单元格、编辑、复制粘贴、插入删除、撤销重做、状态可见”等核心体验；Phase 3 不能按表格编辑工作台验收。 | 已修复：新增可见 `TableWorkbench`，在 Demo Table 页面接入真实 `QTableView + QtTableModel`、示例 `TableDefinition/TableRow` 和工具按钮入口。 | 已关闭 |
-| B10-002 | Phase 3 | P1 | 表格编辑未按字段类型解析输入，粘贴到整数列后会破坏 Phase 2 数据模型契约。 | `TableBuffer.paste_tsv()` 将 TSV 文本直接传给 `set_value()`，`set_value()` 又直接写入 `TableRow.values[field.name]`，没有根据 `FieldType` 做转换或拒绝非法值。 | INT/BOOL/FLOAT/LIST/JSON 等字段会被字符串污染，后续 `ProjectSchema.validate_structure()`、保存、导出或校验链路可能失败；用户粘贴一次就可能制造脏数据。 | 已修复：`TableBuffer` 增加字段类型解析；合法整数粘贴后保持 `int`，非法整数拒绝写入并设置错误状态，schema 结构校验通过。 | 已关闭 |
-| B10-003 | Phase 3 | P2 | 单元格状态更新不会通知 Qt 视图刷新。 | `TableBuffer.set_cell_state()` 只更新内部 `_cell_states`，没有通过 `QtTableModel` 发出 `dataChanged`，也没有集中批量状态更新 API。 | 真实 UI 接入校验结果后，错误、警告、引用、只读状态可能已在数据层变化但界面不刷新，用户看不到最新问题状态。 | 已修复：状态更新通过 `QtTableModel.set_cell_state()` 发出 `dataChanged`，定向测试验证状态变化会触发信号。 | 已关闭 |
-| B10-004 | Phase 3 | P2 | 撤销/重做命令栈直接操作 `TableBuffer`，不会通知视图刷新，失败时还可能丢失历史命令。 | `EditCommandStack.undo()`/`redo()` 直接调用 `buffer.set_value()`，没有通过 `QtTableModel.setData()` 或回调发出 `dataChanged`；并且 `undo()` 先从栈 pop，再尝试写回。 | UI 中执行撤销/重做后，底层数据可能变化但视图不刷新；如果写回失败，命令已经从栈中丢失，后续无法恢复。 | 已修复：命令栈通过 `QtTableModel.setData()` 写入并发出刷新信号，失败时不移动历史命令。 | 已关闭 |
-| B10-005 | Phase 3 | P2 | Table Engine 测试数据与 Phase 2 ID 类型契约不一致。 | `tests/test_table_engine.py` 中 `FieldType.ID` 使用 `"item_001"` 字符串，但当前 Phase 2 结构校验把 `FieldType.ID` 与 `FieldType.INT` 一起按 `int` 校验。 | 表格引擎测试可能在绕过 `ProjectSchema.validate_structure()` 的情况下通过，掩盖真实 schema 校验失败风险；ID 类型语义不清会影响引用、导入导出和主键编辑。 | 已修复：Table Engine 测试与示例数据改用整数 ID，并补充 schema 结构校验路径。 | 已关闭 |
-| B10-006 | Phase 3 | P2 | 表格范围操作缺少边界保护和异常场景测试。 | `copy_range()`、`horizontal_header()`、`vertical_header()`、`value_at()` 等方法直接按索引访问，主要依赖 Qt 正常路径不越界。 | 后续查找、筛选、批量编辑、脚本化操作或 UI 事件错位时可能抛出未处理异常，影响大表编辑稳定性。 | 已修复：范围访问增加边界保护，补充空表、越界复制、越界取值、越界粘贴和删除测试。 | 已关闭 |
-
-#### 6.13.1 第十批次结论
-
-第十批次整改通过复验，`B10-001` 至 `B10-006` 全部关闭。Phase 3 已具备最小可见表格工作台入口，可开始进行有限操作测试；查找、替换、筛选、排序和完整业务编辑闭环仍需后续批次继续推进。复验过程中曾观察到一次 Demo 焦点用例失败，但随后全量、组合定向和 5 次重复定向均通过，暂不作为未关闭项；若再次复现，应单独记录为 UI 自动化稳定性问题。
-
-### 6.14 第十一批次（合并）：Phase 3 表格工作台增量开发自动批次汇总评估
-
-- **来源**：原第 11 至第 29 批次，均为自动触发的开发记录批次，未经过人工 QA 审查即被标记为"已验收/已关闭"。
-- **合并说明**：原批次 11-29 分散记录了 Phase 3 `TableWorkbench` 的逐项增量开发（筛选、查找、替换、排序、撤销/重做闭环、键盘快捷键、只读反馈、大表滚动反馈等），每个批次的开发-自测-复验均由同一角色闭环完成，缺少独立的人工验收环节。按照新修订的评估记录规则，此 19 个自动批次应整体归档为一个合并批次，详细问题记录迁移至 Phase 3 Review 文档。
-- **范围**：Phase 3 表格编辑工作台（`TableWorkbench` / `TableBuffer` / `QtTableModel` / `EditCommandStack`）的完整功能集，包括：筛选/清除筛选、查找/替换、排序、单元格编辑提交/取消、复制粘贴、批量填充、插入/删除行、撤销/重做闭环、键盘快捷键、只读保护、大表滚动与定位反馈。
-- **当前状态**：**待人工复验**。原自动批次标记的"已关闭"状态全部撤回，合并为第十一批次统一重新评估。
-- **当前会话角色**：测试角色。
-
-#### 6.14.1 原批次概况（11-29）
-
-| 原批次 | 内容 | 原状态 | 合并后状态 |
-| --- | --- | --- | --- |
-| 11 | 筛选与查找入口 | 已关闭 | 待复验 |
-| 12 | 替换入口 | 已关闭 | 待复验 |
-| 13 | 排序入口 | 已关闭 | 待复验 |
-| 14 | 单格粘贴撤销/重做闭环 | 已关闭 | 待复验 |
-| 15 | 多格粘贴撤销/重做闭环 | 已关闭 | 待复验 |
-| 16 | 插入/删除行撤销/重做闭环 | 已关闭 | 待复验 |
-| 17 | 批量填充撤销/重做闭环 | 已关闭 | 待复验 |
-| 18 | 键盘复制/粘贴/撤销/重做工作流 | 已关闭 | 待复验 |
-| 19 | 只读写入拒绝反馈 | 已关闭 | 待复验 |
-| 20 | 可见编辑提交/取消体验 | 已关闭 | 待复验 |
-| 21 | 大表批量编辑反馈 | 已关闭 | 待复验 |
-| 22 | 大表批量操作后定位反馈 | 已关闭 | 待复验 |
-| 23 | 大表 Ctrl+Home/End 导航 | 已关闭 | 待复验 |
-| 24 | 大表 Ctrl+Left/Right 导航 | 已关闭 | 待复验 |
-| 25 | 大表滚动位置反馈 | 已关闭 | 待复验 |
-| 26 | 大表可见范围反馈 | 已关闭 | 待复验 |
-| 27 | 大表可见范围状态文本 | 已关闭 | 待复验 |
-| 28 | 大表滚动进度状态文本 | 已关闭 | 待复验 |
-| 29 | 大表滚动方向状态反馈 | 已关闭 | 待复验 |
-
-#### 6.14.2 人工验收发现的关键问题（含根因分析）
-
-经 QA 角色通过 `python C:/XTable/tests/run_phase3_acceptance.py` 执行 59 项自动化 UI 验收探针（54 通过/5 失败），并结合源代码审查，确认以下问题及其根因：
-
-| ID | 级别 | 问题 | 根因分析 | 修改建议 |
-| --- | --- | --- | --- | --- |
-| B11-001 | P1 | Table 工作区布局不正常。`TableExplorer` 被放置在 `mode_bar`（固定高度 32px 的水平模式切换条）的 `QHBoxLayout` 中，而非作为独立的左侧导航面板。Explorer 实际尺寸为 161×625px，被挤在高度仅 32px 的容器中，导致 Explorer 视觉上不可见或严重裁剪。 | 在 `_build_table_page()` 中，`self._table_explorer` 通过 `mode_layout.addWidget(self._table_explorer)` 加入了 `mode_bar` 的布局。该 bar 设计用途是容纳模式切换按钮，但被错误地用于承载完整的 `TableExplorer` 组件。 | 将 `TableExplorer` 从 `mode_bar` 中移出，放置在独立的分栏面板中。推荐方案：将 `page-table` 改为水平分栏，左侧为 `TableExplorer`（宽度 180-220px），右侧为 `mode_bar` + `_table_mode_stack` 的垂直组合。参考 `work_layout` 中已有的 `rail + pages + inspector` 布局模式。 |
-| B11-002 | P1 | 表格数据/结构切换按钮功能不正常。两个 `QToolButton` 可以单独选中/取消，但互斥行为失效，且 `_switch_table_mode` 不会被调用，模式栈不切换。 | `_build_table_page()` 中创建的 `QButtonGroup mode_group` 是**局部变量**，函数返回后无任何引用持有它。Python GC 回收该对象后，按钮的互斥（exclusive）行为和 `idClicked` 信号全部失效。runtime 探针确认 `data_btn.group()` 返回 `None`。 | 将 `mode_group` 保存为实例属性：`self._table_mode_group = QButtonGroup()` 或设置其 parent 为 `mode_bar`/`page` 防止 GC。修复后在验收测试中验证 `data_btn.group() is not None`、点击结构按钮后 mode_stack index=1、两按钮互斥。 |
-| B11-003 | P1 | 新建表格和删除表格按钮存在且在 offscreen 测试中可点击，但在真实桌面环境中 `QInputDialog.getText()` 弹出系统原生对话框，用户体验和功能需要验证。 | 按钮类型为 `IconToolButton`（非 `QPushButton`），在自动化测试中 `findChild(QPushButton, ...)` 找不到，容易被误判为"按钮不存在"。实际运行时按钮可点击，但 `QInputDialog` 未经项目 Dialog 服务封装。 | 参照 B11-004 统一使用项目 Dialog 服务；修复后测试应确认按钮可点击 + 弹窗为主题化输入框 + 输入有效 ID 后表格成功创建且出现在 Explorer 列表中。 |
-| B11-004 | P2 | 新建表格 (`QInputDialog.getText`) 和删除确认弹窗使用系统原生样式，不兼容 Dark/Light 主题。与 B6-008 同源问题。 | `TableExplorer._on_add()` 和 `_on_delete()` 分别直接调用 `QInputDialog.getText()` 和 `ConfirmDialog`（后者已主题化，但 `QInputDialog` 未封装）。 | 新增项目主题化输入弹窗组件（如 `TextInputDialog`），替换 `QInputDialog.getText()`；删除确认弹窗已使用 `ConfirmDialog`，需确保其样式在 Dark 主题下通过验收。 |
-| B11-005 | P2 | 字段排列列表在 Dark 主题下未突出选中字段。 | 主题 QSS 中 `QListWidget::item:selected` 样式未针对 Dark 主题设置足够对比度的背景色和文字色。 | 在 Dark 主题中补充 `QListWidget::item:selected { background: <selection_bg>; color: <selection_text>; }` 高对比样式；在验收测试中验证 Dark 主题下 `field_list.currentItem()` 可见且视觉区分明显。 |
-| B11-006 | P2 | Inspector 切换按钮缺少图标。工具栏中 `action-toggle-inspector` 仅有文字无图标，用户无法快速识别该功能。 | `create_actions` 未为 `action-toggle-inspector` 设置图标。项目中已有 `inspect` SVG 图标（`src/xtable/ui/resources/icons/inspect.svg`）但未关联到该 action。 | 在 `ACTION_SPECS` 中为 `action-toggle-inspector` 添加 `icon_id="inspect"`；修改 `create_actions` 或 action spec 使用 `icon_for("inspect", theme)` 加载图标。 |
-
-#### 6.14.3 自动化验收探针结果（2026-05-27 完整复测）
-
-QA 角色编写 **95 项运行时 UI 验收探针**（`tests/run_phase3_acceptance.py`），覆盖 10 个完整用户场景，生成 12 张关键截图：
-
-| 场景 | 测试数 | 通过 | 失败 | 截图 |
-| --- | --- | --- | --- | --- |
-| 1. 启动应用 & 初始状态 | 13 | 13 | 0 | `01-app-initial-state.png` |
-| 2. 切换到结构模式 | 5 | 2 | 3 | `02-structure-mode.png` |
-| 3. 编辑表格元数据 | 7 | 7 | 0 | `03-table-metadata-edited.png` |
-| 4. 字段管理(增删排序) | 16 | 16 | 0 | `04/05-fields-*.png` |
-| 5. Inspector 属性面板联动 | 4 | 4 | 0 | `06-inspector-*.png` |
-| 6. 主题兼容性(Light/Dark) | 6 | 6 | 0 | `07/08-*-theme.png` |
-| 7. 数据模式表格工作台 | 16 | 16 | 0 | `09-data-mode.png` |
-| 8. 表格增删流程 | 7 | 6 | 1 [注] | `10/11-table-*.png` |
-| 9. Schema 脏状态追踪 | 3 | 3 | 0 | — |
-| 10. 稳定性压力测试 | 18 | 18 | 0 | `12-stress-test-final.png` |
-| **合计** | **95** | **91** | **4** | **12 张** |
-
-**[注]** 场景 8 失败项（删除后 current_table_id=None）为测试方法 artifact：测试直接操作 `schema.tables` 并调用 `load_schema()` 而非通过 Explorer 删除按钮流程。Explorer 的 `_on_delete` 流程中此场景已正确处理（`list.setCurrentRow(0)`）。此项在下轮真实桌面验收中不需复验。
-
-**结论**：95 项中 91 项通过（96%）。唯一阻塞问题是 **QButtonGroup GC** 导致模式切换失效（3 项 P1 失败），其余 88 项全部正常，包括：
-- 结构编辑器全功能（增删排序字段、边界保护、拖拽模拟）✅
-- Light/Dark 主题切换稳定性 ✅
-- 表格工作台所有工具栏和输入控件存在且可用 ✅
-- Schema 脏状态追踪 ✅
-- 30 次快速模式切换 + 20 次主题切换 + 增删字段穿插主题切换 + 5 表批量增删全部无崩溃 ✅
-
-截图证据目录：`docs/previews/phase3-acceptance/`（12 张 PNG）
-
-#### 6.14.4 合并结论（2026-05-27 更新）
-
-**Phase 3 当前不具备验收条件，需打回重做。** 
-
-经过 95 项自动化 UI 验收探针 + 源代码审查，确认 6 项关键问题：
-
-| 分类 | 数量 | 问题 |
-| --- | --- | --- |
-| 必须修复（P1） | 1 | **QButtonGroup GC** — 修复后 B11-002 的 3 个症状自动消除 |
-| 必须修复（P1） | 1 | **TableExplorer 布局位置** — 从 mode_bar 移出为独立侧边面板 |
-| 必须修复（P1） | 1 | **QInputDialog 主题化** — 替换为项目 Dialog 服务封装（B11-004 的一部分已通过 ConfirmDialog 解决） |
-| 应修复（P2） | 3 | B11-004 输入弹窗主题化、B11-005 Dark 选中态、B11-006 Inspector 图标 |
-
-修复工作量评估：B11-002 一行修改（`mode_group` 设为实例属性或设置 parent），B11-001 需重构 `_build_table_page()` 布局，B11-004 需新增 `TextInputDialog` 组件。其余 88 项功能测试通过，证明除布局和模式切换外，核心编辑能力（字段增删排序、元数据编辑、主题切换、数据模式工具、压力稳定性）已就绪。
-
-#### 6.14.5 后续要求
-
-- Phase 3 修复完成后，需建立独立的 `docs/phase-3-review.md` 记录完整的人工验收问题清单、截图证据和通过/失败结论。
-- 开发日志 `docs/development-log.md` 中 Phase 3 的完成度需与本合并批次的无关闭问题保持一致，不得在有 P1 未关闭的情况下标记为"已完成"或"90%+"。
-- 后续 Phase 4/5/6/7/8 的验收均需遵循新规范，在对应 Phase Review 文档中独立记录。

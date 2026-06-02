@@ -4,13 +4,13 @@
 
 ## 1. 当前状态
 
-- 当前阶段：Phase 3 - 表格编辑工作台
-- 当前 Sprint：Sprint 3 - 表格编辑工作台（打回重做）
+- 当前阶段：Phase 2 - 核心数据模型
+- 当前 Sprint：Sprint 2 - 核心数据模型
 - 当前负责人：Codex
-- 当前会话协作角色：测试角色；已完成 Phase 3 自动批次 11-29 的合并评估，结论为打回重做
-- 最近更新时间：2026-05-27
-- 总体进度：48%（Phase 3 由 90% 下调至打回重做）
-- 验收完整度：Phase 3 自动批次 11-29 全部撤回，合并为第十一批次待复验，发现 6 项关键问题（含 3 项 P1），当前不具备验收条件
+- 当前会话协作角色：开发角色；负责修复第八批次 Phase 2 模型结构校验问题，职责边界见 [项目角色协作规范](./project-role-guidelines.md)
+- 最近更新时间：2026-05-24
+- 总体进度：30%
+- 验收完整度：Phase 0/1 第一批次至第七批次评估问题均已复验通过并关闭；第八批次结构校验问题已完成开发修复，等待复验
 
 ## 2. 状态枚举
 
@@ -31,8 +31,8 @@
 | Phase 0：工程骨架与技术基线 | 已完成 | 100% | 100% | 第一、第二、第三批次相关问题均已关闭 |
 | Phase 1：项目与文件系统 | 待验收 | 97% | 97% | 第一至第五批次评估问题均已关闭；Editor UI Demo 规划作为后续 UI 基座前置目标 |
 | Phase 1.5：Editor UI Demo 与 UI Kit 基座 | 待验收 | 97% | 96% | 第七批次二次复验通过并关闭；本次 UI 规范扫描将 Demo 非确认场景文本按钮替换为图标按钮，并补充门禁测试 |
-| Phase 2：核心数据模型 | 已完成 | 100% | 95% | 最新功能测试验收通过：引用索引、默认值模板、结构变更影响检查、模型复制派生和 schema 迁移入口均已补齐；剩余复杂规则和真实编辑工作流转入 Phase 3/4/5 |
-| Phase 3：表格编辑工作台 | 进行中（打回重做） | 70% | 待复验 | 第十批次整改复验通过；自动批次 11-29 全部撤回合并为第十一批次，人工验收发现 6 项关键问题（3 项 P1：布局不正常、模式切换按钮失效、增删表格按钮失效；3 项 P2：弹窗不符合 UI 规范、Dark 主题字段列表选中态缺失、Inspector 按钮缺图标），当前不具备验收条件，需打回重做 |
+| Phase 2：核心数据模型 | 进行中 | 35% | 28% | 第八批次结构校验已完成开发修复：补齐引用完整性、表类型参数、Enum/Meta 结构、行结构和字段类型参数契约，等待复验 |
+| Phase 3：表格编辑工作台 | 未开始 | 0% | 0% | 依赖 Phase 2 |
 | Phase 4：规则与校验系统 | 未开始 | 0% | 0% | 依赖 Phase 3 |
 | Phase 5：导入导出 | 未开始 | 0% | 0% | 依赖 Phase 4 |
 | Phase 6：Enum、Meta 与高级类型能力 | 未开始 | 0% | 0% | 依赖 Phase 5 |
@@ -168,37 +168,7 @@
   - 字段类型参数后续会随校验、导入导出继续扩展，需要保持 registry 元数据向后兼容。
   - 字段类型参数后续会随校验、导入导出继续扩展，需要保持 registry 元数据向后兼容。
 - 验收结果：
-  - 第八批次结构校验、第九批次 schema 持久化和 Phase 2 整体验收均已通过。
-  - Phase 2 当前开发清单已达到进入 Phase 3 表格编辑工作台的条件；复杂业务校验、导入导出和真实编辑工作流继续在 Phase 3/4/5 推进。
-
-### Sprint 3：表格编辑工作台
-
-- 目标：基于 Phase 2 领域模型建立可编辑表格工作台，覆盖表格模型适配、单元格编辑、选择、复制粘贴、批量填充、插入删除、查找替换、筛选排序和撤销重做。
-- 开始日期：2026-05-25
-- 结束日期：待定
-- 范围：
-  - 建立基于 `QAbstractTableModel` 的表格模型适配层。
-  - 接入 Phase 2 `TableDefinition`、`FieldDefinition` 和 `TableRow` 数据结构。
-  - 实现单元格编辑、提交、取消和只读保护。
-  - 实现选择、复制、粘贴、批量填充和插入删除。
-  - 实现查找、替换、筛选、排序。
-  - 实现撤销/重做命令栈。
-  - 实现错误、警告、只读和引用标记的单元格状态展示。
-- 已完成：
-  - Phase 3 已启动，输入条件已满足：Phase 2 数据模型可用，Phase 1.5 UI Kit 可作为真实编辑界面复用基础。
-- 未完成：
-  - 尚未建立表格模型适配层。
-  - 尚未接入真实表定义、字段定义和行数据。
-  - 尚未实现真实编辑命令、撤销重做、查找替换、筛选排序和单元格状态映射。
-- 风险：
-  - 新增 UI 必须先复用或补齐 `xtable.ui` 组件，避免业务界面绕过 UI Kit 直接创建复杂 Qt 控件。
-  - 表格编辑命令需要尽早形成可测试边界，否则复制粘贴、批量编辑和撤销重做会互相耦合。
-- 验收结果：
-  - 第十批次（B10-001 至 B10-006）整改复验通过并关闭。
-  - 自动批次 11-29 经 QA 人工验收核查，发现 6 项关键问题（B11-001 至 B11-006），全部"已关闭"状态撤回。
-  - **Phase 3 打回重做**。开发角色需修复 B11-001 至 B11-006 后，由测试角色执行完整的人工验收 + 自动化回归，并在 `docs/phase-3-review.md` 中独立记录。
-
-## 7. 变更记录补充 — Phase 3 自动批次合并评估
+  - 第八批次结构校验问题已完成开发修复，等待测试角色复验；Phase 2 继续开发中。
 
 ## 5. 进度记录规则
 
@@ -215,7 +185,6 @@
 
 | 日期 | 类型 | 内容 | 关联文档 |
 | --- | --- | --- | --- |
-| 2026-05-27 | 阶段验收 | Phase 3 完整验收：QA 编写 95 项 UI 验收探针覆盖 10 个用户场景（91 通过/4 失败），生成 12 张截图。唯一阻塞问题为 QButtonGroup GC 导致模式切换失效，其余 88 项（结构编辑器、主题、数据模式、压力测试）全部通过。6 项关键问题根因已定位，修复路径明确。Phase 3 打回重做。 | [阶段开发评估记录](./development-review.md)、[验收截图](./previews/phase3-acceptance/) |
 | 2026-05-23 | 文档规范 | 建立开发计划与开发日志规范，要求后续开发持续维护进度和验收完整度 | [开发计划](./development-plan.md) |
 | 2026-05-23 | 需求拆分 | 将表格类型、字段类型、枚举、数据元和校验规则拆分为独立规格文档 | [主需求文档](./requirements.md) |
 | 2026-05-23 | 阶段验收 | Sprint 0 文档体系本地验收通过，下一阶段为 Phase 0 工程骨架与技术基线 | [开发日志](./development-log.md) |
@@ -255,17 +224,3 @@
 | 2026-05-24 | 阶段开发 | 启动 Phase 2 核心数据模型：新增纯 domain 模型、字段/表格类型注册表、Table/Field/Enum/Meta/ProjectSchema 契约和自动化测试 | [开发计划](./development-plan.md) |
 | 2026-05-24 | 阶段审核 | 新增第八批次 Phase 2 审查：记录核心数据模型结构校验缺口，包括字段引用完整性、主键/特征键/表类型参数、Enum 导出值与默认项、Meta 字段名、行结构和失败用例覆盖不足 | [阶段开发评估记录](./development-review.md) |
 | 2026-05-24 | 返工修复 | 完成第八批次开发修复：补齐 ProjectSchema 结构校验、FieldDefinition 参数契约、Enum/Meta/Table/Row 非法结构拦截和失败用例回归测试 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-25 | 阶段开发 | 完成 Phase 2 Schema 持久化本地方案与执行：新增 `xtable.domain.serialization`、`settings/schema.json` 保存/加载、`schema_digest` 外部修改检测、Meta 循环阻塞与 Table 循环发现；验证 `python -m pytest` 81 项通过，`python -m compileall -q src tests` 通过。 | [Schema 持久化设计](./superpowers/specs/2026-05-25-phase-2-schema-persistence-design.md)、[实施计划](./superpowers/plans/2026-05-25-phase-2-schema-persistence.md) |
-| 2026-05-25 | 阶段验收 | 完成 Phase 2 Schema 持久化新增内容验收：自动化测试 81 项通过、编译通过；新增第九批次 P1 问题，记录未加载 schema 时 `schema_digest` 为空导致已有 schema 可被覆盖的风险。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-25 | 返工修复 | 修复第九批次 `B9-001`：`save_schema()` 在已有 schema 文件且 `schema_digest` 为空时拒绝保存，避免未先 `load_schema()` 的项目覆盖现有 `settings/schema.json`；新增回归测试覆盖该场景，状态标记为待验证。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-25 | 阶段复验 | 第九批次 `B9-001` 复验通过：定向测试、Phase 2 相关 34 项测试、编译检查和独立探针均通过，`schema_digest` 空基线覆盖风险已关闭；当时发现的跨阶段 UI 剪贴板失败已记录为 `X-003`，并在后续整体验收中关闭。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-25 | 文档规范 | 补齐 Phase 0 至 Phase 8 开发清单，并将各阶段测试评估验收清单独立拆分到 `docs/phase-checklists/` 子目录；后续每个 Phase 必须同步维护开发清单和独立验收清单。 | [开发计划](./development-plan.md)、[阶段清单目录](./phase-checklists/phase-2-domain-models.md) |
-| 2026-05-25 | 阶段开发 | 完成 Phase 2 剩余开发清单：新增引用索引与依赖查询、字段默认值与新行模板、结构变更影响检查、模型复制派生与 schema 迁移入口；验证 `python -m pytest` 87 项通过，`python -m compileall -q src tests` 通过。 | [开发计划](./development-plan.md)、[Phase 2 验收清单](./phase-checklists/phase-2-domain-models.md) |
-| 2026-05-25 | 阶段验收 | 验证 Phase 2 最新功能：Phase 2 相关 39 项测试通过、全量 87 项测试通过、编译检查通过、独立运行时探针通过；Phase 2 核心数据模型标记为已完成，跨阶段 `X-003` 剪贴板问题复验关闭。 | [阶段开发评估记录](./development-review.md)、[Phase 2 验收清单](./phase-checklists/phase-2-domain-models.md) |
-| 2026-05-25 | 阶段开发 | 推进 Phase 3 表格编辑工作台首批能力：新增 `xtable.table_engine` 表格模型适配层，接入 Phase 2 表定义与行数据，支持 Qt 行列/表头/取值/编辑/只读 flags、基础复制粘贴、插入删除、单元格状态映射和单元格编辑撤销重做；验证 `python -m pytest` 94 项通过，`python -m compileall -q src tests` 通过。 | [开发计划](./development-plan.md)、[Phase 3 验收清单](./phase-checklists/phase-3-table-workbench.md) |
-| 2026-05-25 | 阶段审核 | 新增第十批次 Phase 3 首批能力评估：自动化 94 项通过，但缺少可见表格工作台 UI，人工操作测试被阻塞；同时记录字段类型转换、单元格状态刷新、撤销重做视图通知、ID 类型契约和越界保护问题。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-25 | 返工修复 | 修复第十批次 `B10-001` 至 `B10-006`：新增可见 `TableWorkbench`/`QTableView` Demo 入口，补字段类型解析与非法输入拒绝，状态更新和撤销重做改由 Qt 模型发出刷新信号，ID 测试数据与 Phase 2 契约对齐，并补范围边界保护；问题状态标记为待验收。继续推进 Phase 3 查找、替换、筛选、排序和批量填充底层能力；验证 `python -m pytest` 97 项通过，`python -m compileall -q src tests` 通过。 | [阶段开发评估记录](./development-review.md)、[Phase 3 验收清单](./phase-checklists/phase-3-table-workbench.md) |
-| 2026-05-25 | 阶段复验 | 第十批次 `B10-001` 至 `B10-006` 复验通过：全量 97 项测试、编译检查、B10 定向 16 项测试和运行时探针均通过；Phase 3 可进入有限表格操作测试，查找、替换、筛选、排序和完整业务闭环继续后续批次。 | [阶段开发评估记录](./development-review.md)、[Phase 3 验收清单](./phase-checklists/phase-3-table-workbench.md) |
-| 2026-05-25 | 阶段开发 | 推进 Phase 3 表格工作台增量功能（自动批次 11-29）：逐项补齐筛选/查找、替换、排序入口，单格/多格粘贴、插入删除、批量填充的撤销/重做闭环，键盘快捷工作流，只读拒绝反馈，可见编辑提交/取消体验，大表滚动与定位反馈。各批次均由开发角色自测后标记为"复验通过，已关闭"。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-27 | 阶段验收 | Phase 3 自动批次 11-29 经 QA 人工验收合并评估：6 项关键问题（P1×3：工作区布局不正常、数据/结构切换按钮失效、增删表格按钮失效；P2×3：弹窗不合 UI 规范、Dark 选中态缺失、Inspector 缺图标）。自动批次"已关闭"状态全部撤回，合并为第十一批次统一管理，Phase 3 打回重做。 | [阶段开发评估记录](./development-review.md) |
-| 2026-05-27 | 返工修复 | Phase 3 扩展功能全部重做：1) 新增表格列表（TableExplorer，IconToolButton+/-）、2) 字段结构编辑器（StructureEditor，IconToolButton ↑↓+/-，拖拽排序）、3) 全局 Inspector 面板（工具栏 inspect 按钮控制、字段选中自动弹出、切换 nav 隐藏）、4) FieldInspector 数据驱动化（set_field/fieldModified 信号/字段类型条件控件）、5) Table 页面 data/structure 模式互斥切换、6) schema dirty 追踪与保存。整个实现严格按照项目 UI Kit 规范：所有按钮用 IconToolButton，图标通过 icon_for() 主题着色，业务按钮禁止 QPushButton。验证 `python -m pytest` 121 项通过，`python -m compileall -q src tests` 通过。 | [开发计划](./development-plan.md)、[Phase 3 验收清单](./phase-checklists/phase-3-table-workbench.md) |

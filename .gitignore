@@ -6,4 +6,3 @@ __pycache__/
 dist/
 build/
 .worktrees/
-.test_project/

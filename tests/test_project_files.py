@@ -13,7 +13,6 @@ from xtable.application.project_service import (
     ProjectFileError,
     ProjectService,
 )
-from xtable.domain.models import EnumDefinition, EnumItem, FieldDefinition, FieldType, NormalTableDefinition, ProjectSchema
 from xtable.domain.project import ProjectSettings
 
 
@@ -246,84 +245,3 @@ def test_recent_projects_are_updated_without_duplicates(tmp_path):
         second.root.resolve(),
     ]
     assert [item.name for item in recent] == ["First", "Second"]
-
-
-def test_project_service_saves_and_loads_schema_file(tmp_path):
-    service = ProjectService()
-    project = service.create_project(tmp_path / "DemoProject", name="Demo")
-    schema = ProjectSchema()
-    schema.add_enum(
-        EnumDefinition(
-            enum_id="quality",
-            display_name="Quality",
-            items=[EnumItem(item_id="common", display_name="Common", export_value=1, sort_order=1)],
-        )
-    )
-    schema.add_table(
-        NormalTableDefinition(
-            table_id="items",
-            display_name="Items",
-            fields=[
-                FieldDefinition(field_id="id", name="id", display_name="ID", field_type=FieldType.ID),
-                FieldDefinition(field_id="quality", name="quality", display_name="Quality", field_type=FieldType.ENUM, enum_id="quality"),
-            ],
-        )
-    )
-
-    saved = service.save_schema(project, schema)
-    loaded = service.load_schema(saved)
-
-    assert (project.root / "settings" / "schema.json").exists()
-    assert saved.schema_digest
-    assert loaded.table("items").field("quality").enum_id == "quality"
-
-
-def test_project_service_load_schema_returns_empty_schema_when_file_missing(tmp_path):
-    service = ProjectService()
-    project = service.create_project(tmp_path / "DemoProject", name="Demo")
-
-    schema = service.load_schema(project)
-
-    assert schema.tables == {}
-    assert schema.enums == {}
-    assert schema.metas == {}
-
-
-def test_project_service_rejects_stale_schema_save(tmp_path):
-    service = ProjectService()
-    project = service.create_project(tmp_path / "DemoProject", name="Demo")
-    schema = ProjectSchema()
-    saved = service.save_schema(project, schema)
-
-    schema_path = project.root / "settings" / "schema.json"
-    original = json.loads(schema_path.read_text(encoding="utf-8"))
-    original["external"] = True
-    schema_path.write_text(json.dumps(original), encoding="utf-8")
-
-    with pytest.raises(ProjectConflictError) as error:
-        service.save_schema(saved, schema)
-
-    assert error.value.kind is FileFailureKind.EXTERNALLY_MODIFIED
-
-
-def test_project_service_rejects_schema_save_without_loaded_digest_when_file_exists(tmp_path):
-    service = ProjectService()
-    project = service.create_project(tmp_path / "DemoProject", name="Demo")
-    schema = ProjectSchema()
-    schema.add_table(
-        NormalTableDefinition(
-            table_id="items",
-            display_name="Items",
-            fields=[FieldDefinition(field_id="id", name="id", display_name="ID", field_type=FieldType.ID)],
-        )
-    )
-    service.save_schema(project, schema)
-
-    reopened = service.open_project(project.root)
-    before = (project.root / "settings" / "schema.json").read_text(encoding="utf-8")
-
-    with pytest.raises(ProjectConflictError) as error:
-        service.save_schema(reopened, ProjectSchema())
-
-    assert error.value.kind is FileFailureKind.EXTERNALLY_MODIFIED
-    assert (project.root / "settings" / "schema.json").read_text(encoding="utf-8") == before

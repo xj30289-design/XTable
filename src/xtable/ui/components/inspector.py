@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import json
 
-from dataclasses import replace
-
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QToolButton,
@@ -17,29 +15,16 @@ from PySide6.QtWidgets import (
     QListWidget,
     QTextEdit,
     QVBoxLayout,
-    QWidget,
 )
 
-from xtable.domain.models import FieldDefinition, FieldType
 from xtable.ui.icons import icon_for
 
 
 class FieldInspector(QFrame):
-    """Data-driven field properties editor.
-
-    Emits ``fieldModified(table_id, field_id, new_FieldDefinition)`` when
-    any form value changes.
-    """
-
-    fieldModified = Signal(str, str, object)  # table_id, field_id, FieldDefinition
-
     def __init__(self, *, theme: str = "light") -> None:
         super().__init__()
         self.setObjectName("field-inspector")
         self.setProperty("theme", theme)
-        self._table_id: str = ""
-        self._field: FieldDefinition | None = None
-        self._suppress_signal = False
 
         root = QVBoxLayout(self)
         root.setContentsMargins(14, 14, 14, 14)
@@ -51,124 +36,33 @@ class FieldInspector(QFrame):
 
         form = QFormLayout()
         form.setContentsMargins(0, 0, 0, 0)
-        form.setSpacing(6)
+        form.setSpacing(8)
 
-        self._field_id_input = QLineEdit()
-        self._field_id_input.setObjectName("field-id-input")
-        self._field_id_input.setReadOnly(True)
-        form.addRow("ID", self._field_id_input)
+        name_input = QLineEdit("item_id")
+        name_input.setObjectName("field-name-input")
+        form.addRow("字段名", name_input)
 
-        self._name_input = QLineEdit()
-        self._name_input.setObjectName("field-name-input")
-        form.addRow("名称", self._name_input)
+        type_input = QComboBox()
+        type_input.setObjectName("field-type-input")
+        type_input.addItems(["Int", "String", "Bool", "Enum", "List<String>", "Json"])
+        form.addRow("类型", type_input)
 
-        self._display_name_input = QLineEdit()
-        self._display_name_input.setObjectName("field-display-name-input")
-        form.addRow("显示名", self._display_name_input)
+        required_input = QCheckBox("必填")
+        required_input.setObjectName("field-required-input")
+        required_input.setChecked(True)
+        form.addRow("约束", required_input)
 
-        self._type_input = QComboBox()
-        self._type_input.setObjectName("field-type-input")
-        form.addRow("类型", self._type_input)
+        default_input = QLineEdit("0")
+        default_input.setObjectName("field-default-input")
+        form.addRow("默认值", default_input)
 
-        self._required_input = QCheckBox("必填")
-        self._required_input.setObjectName("field-required-input")
-        form.addRow("约束", self._required_input)
-
-        self._unique_input = QCheckBox("唯一")
-        self._unique_input.setObjectName("field-unique-input")
-        self._readonly_input = QCheckBox("只读")
-        self._readonly_input.setObjectName("field-readonly-input")
-        form.addRow("", self._unique_input)
-        form.addRow("", self._readonly_input)
-
-        self._default_input = QLineEdit()
-        self._default_input.setObjectName("field-default-input")
-        form.addRow("默认值", self._default_input)
-
-        self._enum_id_input = QLineEdit()
-        self._enum_id_input.setObjectName("field-enum-id-input")
-        self._enum_id_input.setPlaceholderText("Enum ID")
-        form.addRow("枚举", self._enum_id_input)
-
-        self._target_table_input = QLineEdit()
-        self._target_table_input.setObjectName("field-target-table-input")
-        self._target_table_input.setPlaceholderText("目标表 ID")
-        form.addRow("引用表", self._target_table_input)
-
-        self._meta_id_input = QLineEdit()
-        self._meta_id_input.setObjectName("field-meta-id-input")
-        self._meta_id_input.setPlaceholderText("Meta ID")
-        form.addRow("数据元", self._meta_id_input)
-
-        self._description_input = QTextEdit()
-        self._description_input.setObjectName("field-description-input")
-        self._description_input.setFixedHeight(60)
-        form.addRow("说明", self._description_input)
+        description_input = QTextEdit("物品配置表主键，用于程序侧读取。")
+        description_input.setObjectName("field-description-input")
+        description_input.setFixedHeight(78)
+        form.addRow("说明", description_input)
 
         root.addLayout(form)
         root.addStretch()
-
-        self._type_input.addItems([t.value for t in FieldType])
-        self._set_conditional_visibility(FieldType.STRING)
-
-        # Connect signals
-        self._type_input.currentTextChanged.connect(self._on_type_changed)
-        for widget in (
-            self._name_input,
-            self._display_name_input,
-            self._default_input,
-            self._enum_id_input,
-            self._target_table_input,
-            self._meta_id_input,
-        ):
-            widget.textChanged.connect(self._emit_modified)
-        self._type_input.currentTextChanged.connect(self._emit_modified)
-        self._required_input.toggled.connect(self._emit_modified)
-        self._unique_input.toggled.connect(self._emit_modified)
-        self._readonly_input.toggled.connect(self._emit_modified)
-        self._description_input.textChanged.connect(self._emit_modified)
-
-    def set_field(self, field: FieldDefinition | None, table_id: str = "") -> None:
-        self._suppress_signal = True
-        self._table_id = table_id
-        self._field = field
-        if field is None:
-            self._clear_form()
-            self._suppress_signal = False
-            return
-        self.setEnabled(True)
-        self._field_id_input.setText(field.field_id)
-        self._name_input.setText(field.name)
-        self._display_name_input.setText(field.display_name)
-        idx = self._type_input.findText(field.field_type.value)
-        if idx >= 0:
-            self._type_input.setCurrentIndex(idx)
-        self._required_input.setChecked(field.required)
-        self._unique_input.setChecked(field.unique)
-        self._readonly_input.setChecked(field.readonly)
-        self._default_input.setText(str(field.default_value) if field.default_value is not None else "")
-        self._enum_id_input.setText(field.enum_id)
-        self._target_table_input.setText(field.target_table_id)
-        self._meta_id_input.setText(field.meta_id)
-        self._description_input.setPlainText(field.description)
-        self._set_conditional_visibility(field.field_type)
-        self._suppress_signal = False
-
-    def set_field_types(self, types: list[FieldType]) -> None:
-        current = self._type_input.currentText()
-        self._type_input.clear()
-        self._type_input.addItems([t.value for t in types])
-        if current:
-            idx = self._type_input.findText(current)
-            if idx >= 0:
-                self._type_input.setCurrentIndex(idx)
-
-    def clear(self) -> None:
-        self._suppress_signal = True
-        self._field = None
-        self._table_id = ""
-        self._clear_form()
-        self._suppress_signal = False
 
     def set_field_state(self, state: str) -> None:
         self.setProperty("field-state", state)
@@ -181,90 +75,12 @@ class FieldInspector(QFrame):
             child.setEnabled(state != "disabled")
             child.setReadOnly(state == "readonly")
             child.setProperty("display-mode", "readonly" if state == "readonly" else "editable")
-        for child in self.findChildren(QComboBox):
+        for child in self.findChildren((QComboBox)):
             child.setEnabled(state not in {"disabled", "readonly"})
             child.setProperty("display-mode", "readonly" if state == "readonly" else "editable")
         for child in self.findChildren(QCheckBox):
             child.setEnabled(state not in {"disabled", "readonly"})
             child.setProperty("display-mode", "readonly" if state == "readonly" else "editable")
-
-    def _on_type_changed(self, _type_str: str) -> None:
-        try:
-            field_type = FieldType(_type_str)
-        except ValueError:
-            return
-        self._set_conditional_visibility(field_type)
-
-    def _set_conditional_visibility(self, field_type: FieldType) -> None:
-        layout = self.findChild(QFormLayout)
-        if layout is None:
-            return
-        for label_text, input_widget in (("枚举", self._enum_id_input), ("引用表", self._target_table_input), ("数据元", self._meta_id_input)):
-            for i in range(layout.rowCount()):
-                field_item = layout.itemAt(i, QFormLayout.ItemRole.FieldRole)
-                if field_item and field_item.widget() is input_widget:
-                    label_item = layout.itemAt(i, QFormLayout.ItemRole.LabelRole)
-                    row_widget = label_item.widget().parentWidget() if label_item and label_item.widget() else None
-                    if isinstance(row_widget, QWidget):
-                        row_widget.setVisible(False)
-        if field_type == FieldType.ENUM:
-            self._set_row_visible(self._enum_id_input, True)
-        elif field_type == FieldType.REFERENCE:
-            self._set_row_visible(self._target_table_input, True)
-        elif field_type == FieldType.META:
-            self._set_row_visible(self._meta_id_input, True)
-
-    def _set_row_visible(self, widget: QWidget, visible: bool) -> None:
-        layout = self.findChild(QFormLayout)
-        if layout is None:
-            return
-        for i in range(layout.rowCount()):
-            field_item = layout.itemAt(i, QFormLayout.ItemRole.FieldRole)
-            if field_item and field_item.widget() is widget:
-                label_item = layout.itemAt(i, QFormLayout.ItemRole.LabelRole)
-                if label_item and label_item.widget():
-                    label_item.widget().setVisible(visible)
-                widget.setVisible(visible)
-                return
-
-    def _clear_form(self) -> None:
-        self._field_id_input.clear()
-        self._name_input.clear()
-        self._display_name_input.clear()
-        self._type_input.setCurrentIndex(0)
-        self._required_input.setChecked(False)
-        self._unique_input.setChecked(False)
-        self._readonly_input.setChecked(False)
-        self._default_input.clear()
-        self._enum_id_input.clear()
-        self._target_table_input.clear()
-        self._meta_id_input.clear()
-        self._description_input.clear()
-        self._set_conditional_visibility(FieldType.STRING)
-        self.setEnabled(False)
-
-    def _emit_modified(self) -> None:
-        if self._suppress_signal or self._field is None:
-            return
-        try:
-            field_type = FieldType(self._type_input.currentText())
-        except ValueError:
-            return
-        new_field = replace(
-            self._field,
-            name=self._name_input.text(),
-            display_name=self._display_name_input.text(),
-            field_type=field_type,
-            required=self._required_input.isChecked(),
-            unique=self._unique_input.isChecked(),
-            readonly=self._readonly_input.isChecked(),
-            default_value=self._default_input.text() or None,
-            enum_id=self._enum_id_input.text(),
-            target_table_id=self._target_table_input.text(),
-            meta_id=self._meta_id_input.text(),
-            description=self._description_input.toPlainText(),
-        )
-        self.fieldModified.emit(self._table_id, self._field.field_id, new_field)
 
 
 class PickerShell(QFrame):

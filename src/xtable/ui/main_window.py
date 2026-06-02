@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -18,13 +17,8 @@ from PySide6.QtWidgets import (
 )
 
 from xtable.application.project_service import ProjectError, ProjectService
-from xtable.domain.models import NormalTableDefinition, ProjectSchema
 from xtable.domain.project import Project
 from xtable.ui.actions import ACTION_SPECS, create_actions
-from xtable.ui.components.inspector_panel import InspectorPanel
-from xtable.ui.components.structure_editor import StructureEditor
-from xtable.ui.components.table_explorer import TableExplorer
-from xtable.ui.components.tables import TableWorkbench
 from xtable.ui.dialogs import ProjectDialogs
 from xtable.ui.icons import icon_for
 from xtable.ui.issue_drawer import IssueDrawer
@@ -42,17 +36,7 @@ class MainWindow(QMainWindow):
         self.project_service = project_service or ProjectService()
         self.dialogs = dialogs or ProjectDialogs()
         self.current_project: Project | None = None
-        self.project_schema: ProjectSchema | None = None
-        self.table_workbench: TableWorkbench | None = None
-        self._table_explorer: TableExplorer | None = None
-        self._structure_editor: StructureEditor | None = None
-        self.inspector_panel: InspectorPanel | None = None
-        self._schema_dirty: bool = False
-        self._table_mode_stack: QStackedWidget | None = None
-        self._data_btn: QToolButton | None = None
-        self._structure_btn: QToolButton | None = None
         self.issue_counts = (0, 0, 0)
-        self._page_keys = ("table", "enum", "meta")
         self.setObjectName("xtable-main-window")
         self.setWindowTitle("XTable")
         self.resize(1200, 760)
@@ -64,7 +48,6 @@ class MainWindow(QMainWindow):
                 "action-save-project": self.save_project,
                 "action-toggle-theme": self.toggle_theme,
                 "action-toggle-issues": lambda: self.toggle_issue_drawer("issues"),
-                "action-toggle-inspector": self._toggle_inspector,
                 "action-open-ui-kit-demo": self.open_ui_kit_demo,
                 "action-exit": self.close,
             },
@@ -108,7 +91,6 @@ class MainWindow(QMainWindow):
         toolbar.addWidget(spacer)
         toolbar.addAction(self.actions["action-toggle-theme"])
         toolbar.addAction(self.actions["action-diagnostics"])
-        toolbar.addAction(self.actions["action-toggle-inspector"])
 
     def _build_workspace(self) -> None:
         root = QWidget()
@@ -134,19 +116,6 @@ class MainWindow(QMainWindow):
 
         self.pages = QStackedWidget()
         self.pages.setObjectName("workspace-pages")
-
-        table_page = self._build_table_page()
-        self.pages.addWidget(table_page)
-
-        enum_page = QLabel("Enum 工作区")
-        enum_page.setObjectName("page-enum")
-        enum_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pages.addWidget(enum_page)
-        meta_page = QLabel("Meta 工作区")
-        meta_page.setObjectName("page-meta")
-        meta_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pages.addWidget(meta_page)
-
         for key, title, icon_text in (
             ("table", "Table", "table"),
             ("enum", "Enum", "enum"),
@@ -164,13 +133,14 @@ class MainWindow(QMainWindow):
             button.clicked.connect(lambda checked=False, page_key=key: self.show_page(page_key))
             rail_layout.addWidget(button)
 
+            page = QLabel(f"{title} 工作区")
+            page.setObjectName(f"page-{key}")
+            page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.pages.addWidget(page)
+
         rail_layout.addStretch()
-
-        self.inspector_panel = InspectorPanel(theme=self.property("theme") or "light")
-
         work_layout.addWidget(rail)
         work_layout.addWidget(self.pages, 1)
-        work_layout.addWidget(self.inspector_panel)
 
         self.issue_drawer = IssueDrawer()
         self.main_splitter.addWidget(work_area)
@@ -180,70 +150,6 @@ class MainWindow(QMainWindow):
         outer_layout.addWidget(self.main_splitter, 1)
         self.setCentralWidget(root)
         self.show_page("table")
-
-    def _build_table_page(self) -> QWidget:
-        page = QWidget()
-        page.setObjectName("page-table")
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        mode_bar = QFrame()
-        mode_bar.setObjectName("table-mode-bar")
-        mode_bar.setFixedHeight(32)
-        mode_layout = QHBoxLayout(mode_bar)
-        mode_layout.setContentsMargins(0, 0, 0, 0)
-        mode_layout.setSpacing(2)
-
-        self._data_btn = QToolButton()
-        self._data_btn.setObjectName("table-mode-data-button")
-        self._data_btn.setText("表格数据")
-        self._data_btn.setCheckable(True)
-        self._data_btn.setChecked(True)
-        self._data_btn.setToolTip("切换到数据视图")
-        self._structure_btn = QToolButton()
-        self._structure_btn.setObjectName("table-mode-structure-button")
-        self._structure_btn.setText("表格结构")
-        self._structure_btn.setCheckable(True)
-        self._structure_btn.setToolTip("切换到结构视图")
-
-        mode_group = QButtonGroup()
-        mode_group.setExclusive(True)
-        mode_group.addButton(self._data_btn)
-        mode_group.addButton(self._structure_btn)
-        mode_group.idClicked.connect(self._switch_table_mode)
-
-        mode_layout.addStretch()
-        mode_layout.addWidget(self._data_btn)
-        mode_layout.addWidget(self._structure_btn)
-        layout.addWidget(mode_bar)
-
-        body_layout = QHBoxLayout()
-        body_layout.setContentsMargins(0, 0, 0, 0)
-        body_layout.setSpacing(0)
-
-        self._table_explorer = TableExplorer(theme=self.property("theme") or "light")
-        body_layout.addWidget(self._table_explorer)
-
-        self._table_mode_stack = QStackedWidget()
-        self._table_mode_stack.setObjectName("table-mode-stack")
-
-        self.table_workbench = TableWorkbench(theme=self.property("theme") or "light")
-        self._table_mode_stack.addWidget(self.table_workbench)
-
-        self._structure_editor = StructureEditor(theme=self.property("theme") or "light")
-        self._table_mode_stack.addWidget(self._structure_editor)
-
-        body_layout.addWidget(self._table_mode_stack, 1)
-        layout.addLayout(body_layout, 1)
-
-        self._table_explorer.table_selected.connect(self._on_table_selected)
-        self._table_explorer.table_added.connect(self._on_table_added)
-        self._table_explorer.table_deleted.connect(self._on_table_deleted)
-        self._structure_editor.field_focused.connect(self._on_field_focused)
-        self._structure_editor.schema_modified.connect(self._on_schema_modified)
-
-        return page
 
     def _build_status_bar(self) -> None:
         status_bar = EditorStatusBar(lambda: self.toggle_issue_drawer("issues"))
@@ -255,14 +161,11 @@ class MainWindow(QMainWindow):
         if page is None:
             return
         self.pages.setCurrentWidget(page)
-        for nav_key in self._page_keys:
+        for nav_key in ("table", "enum", "meta"):
             button = self.findChild(QToolButton, f"nav-{nav_key}")
             if button is not None:
                 button.setChecked(nav_key == key)
         self.statusBar().set_object(key)
-        if key != "table" and self.inspector_panel and self.inspector_panel.has_content():
-            self.inspector_panel.clear()
-            self.actions["action-toggle-inspector"].setChecked(False)
 
     def apply_theme(self, theme: str) -> None:
         self.setProperty("theme", theme)
@@ -271,18 +174,10 @@ class MainWindow(QMainWindow):
             action = self.actions.get(spec.action_id)
             if action is not None:
                 action.setIcon(icon_for(spec.icon_id, theme))
-        for key in self._page_keys:
+        for key in ("table", "enum", "meta"):
             button = self.findChild(QToolButton, f"nav-{key}")
             if button is not None:
                 button.setIcon(icon_for(button.property("icon-id"), theme))
-        if self.inspector_panel:
-            self.inspector_panel.apply_theme(theme)
-        if self._table_explorer:
-            self._table_explorer.setProperty("theme", theme)
-        if self._structure_editor:
-            self._structure_editor.setProperty("theme", theme)
-        if self.table_workbench:
-            self.table_workbench.setProperty("theme", theme)
         self.update_issue_summary(*self.issue_counts)
 
     def toggle_theme(self) -> None:
@@ -308,7 +203,10 @@ class MainWindow(QMainWindow):
     def set_diagnostics_drawer_height(self, height: int) -> None:
         self.configure_diagnostics_drawer_bounds()
         self.issue_drawer.setVisible(True)
-        bounded_height = max(self.issue_drawer.minimumHeight(), min(height, self.issue_drawer.maximumHeight()))
+        bounded_height = max(
+            self.issue_drawer.minimumHeight(),
+            min(height, self.issue_drawer.maximumHeight()),
+        )
         self.ui_state["diagnostics_drawer_height"] = bounded_height
         total_height = max(self.main_splitter.height(), bounded_height + 1)
         self.main_splitter.setSizes([total_height - bounded_height, bounded_height])
@@ -317,7 +215,12 @@ class MainWindow(QMainWindow):
         self.issue_counts = (errors, warnings, infos)
         status_bar = self.statusBar()
         if hasattr(status_bar, "update_issue_summary"):
-            status_bar.update_issue_summary(errors, warnings, infos, self.property("theme") or "light")
+            status_bar.update_issue_summary(
+                errors,
+                warnings,
+                infos,
+                self.property("theme") or "light",
+            )
 
     def create_project(self) -> None:
         options = self.dialogs.get_project_create_options(self)
@@ -326,7 +229,6 @@ class MainWindow(QMainWindow):
         try:
             root = options.pop("root")
             self.current_project = self.project_service.create_project(root, **options)
-            self._load_project_schema()
             self._show_project_state("已创建项目")
         except ProjectError as error:
             self.dialogs.show_error(self, "新建项目失败", str(error))
@@ -337,7 +239,6 @@ class MainWindow(QMainWindow):
             return
         try:
             self.current_project = self.project_service.open_project(root)
-            self._load_project_schema()
             self._show_project_state("已打开项目")
         except ProjectError as error:
             self.dialogs.show_error(self, "打开项目失败", str(error))
@@ -347,15 +248,7 @@ class MainWindow(QMainWindow):
             self.dialogs.show_error(self, "保存项目失败", "当前没有打开的项目。")
             return
         try:
-            if self._schema_dirty and self.project_schema is not None:
-                try:
-                    self.project_schema.validate_structure()
-                except ValueError as error:
-                    self.dialogs.show_error(self, "校验失败", str(error))
-                    return
-                self.current_project = self.project_service.save_schema(self.current_project, self.project_schema)
-            self.current_project = self.project_service.save_project(self.current_project)
-            self._clear_schema_dirty()
+            self.project_service.save_project(self.current_project)
             self._show_project_state("已保存项目")
         except ProjectError as error:
             self.dialogs.show_error(self, "保存项目失败", str(error))
@@ -365,98 +258,6 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(f"{message}：{self.current_project.settings.name}")
         self.statusBar().set_project(self.current_project.settings.name)
-
-    def _load_project_schema(self) -> None:
-        if self.current_project is None or self.table_workbench is None:
-            return
-        try:
-            self.project_schema = self.project_service.load_schema(self.current_project)
-        except ProjectError:
-            self.project_schema = ProjectSchema()
-        if self._table_explorer is not None:
-            self._table_explorer.load_schema(self.project_schema)
-        normal_tables = [t for t in self.project_schema.tables.values() if isinstance(t, NormalTableDefinition)]
-        if normal_tables:
-            self._set_table(normal_tables[0])
-            if self._table_explorer:
-                self._table_explorer.set_selected(normal_tables[0].table_id)
-        self._clear_schema_dirty()
-
-    def _set_table(self, table: NormalTableDefinition) -> None:
-        if self.table_workbench is None or self._structure_editor is None:
-            return
-        self.table_workbench.set_table(table)
-        self._structure_editor.set_table(table)
-        if self._data_btn:
-            self._data_btn.setChecked(True)
-        if self._table_mode_stack:
-            self._table_mode_stack.setCurrentIndex(0)
-
-    def _switch_table_mode(self, _button_id: int) -> None:
-        if self._table_mode_stack is None:
-            return
-        self._table_mode_stack.setCurrentIndex(0 if self._data_btn and self._data_btn.isChecked() else 1)
-
-    def _switch_to_structure_mode(self) -> None:
-        if self._structure_btn:
-            self._structure_btn.setChecked(True)
-        if self._table_mode_stack:
-            self._table_mode_stack.setCurrentIndex(1)
-
-    def _on_table_selected(self, table_id: str) -> None:
-        if self.project_schema is None:
-            return
-        table = self.project_schema.tables.get(table_id)
-        if isinstance(table, NormalTableDefinition):
-            self._set_table(table)
-
-    def _on_table_added(self, table_id: str) -> None:
-        self._mark_schema_dirty()
-        self._switch_to_structure_mode()
-
-    def _on_table_deleted(self, table_id: str) -> None:
-        self._mark_schema_dirty()
-        if self.project_schema is None:
-            return
-        remaining = [t for t in self.project_schema.tables.values() if isinstance(t, NormalTableDefinition)]
-        if remaining and self.table_workbench:
-            self._set_table(remaining[0])
-
-    def _on_field_focused(self, table_id: str, field_id: str) -> None:
-        if self.project_schema is None or self.inspector_panel is None:
-            return
-        table = self.project_schema.tables.get(table_id)
-        if table is None:
-            return
-        field = table.field(field_id)
-        if field is not None:
-            self.inspector_panel.show_field(table_id, field)
-            self.inspector_panel.setVisible(True)
-            self.actions["action-toggle-inspector"].setChecked(True)
-
-    def _on_schema_modified(self, table_id: str) -> None:
-        self._mark_schema_dirty()
-        if self.project_schema is not None and self.table_workbench is not None:
-            table = self.project_schema.tables.get(table_id)
-            if isinstance(table, NormalTableDefinition):
-                self.table_workbench.set_table(table)
-
-    def _toggle_inspector(self) -> None:
-        if self.inspector_panel is None:
-            return
-        if self.inspector_panel.isVisible():
-            self.inspector_panel.clear()
-        else:
-            self.inspector_panel.setVisible(True)
-        self.actions["action-toggle-inspector"].setChecked(self.inspector_panel.isVisible())
-
-    def _mark_schema_dirty(self) -> None:
-        self._schema_dirty = True
-        self.setWindowTitle("XTable *")
-
-    def _clear_schema_dirty(self) -> None:
-        self._schema_dirty = False
-        self.setWindowTitle("XTable")
 
     def open_ui_kit_demo(self) -> None:
         from xtable.ui.demo import create_demo_window

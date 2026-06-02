@@ -31,7 +31,6 @@ class Project:
     root: Path
     settings: ProjectSettings
     config_digest: str
-    schema_digest: str = ""
 
     @property
     def config_path(self) -> Path:

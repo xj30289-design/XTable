@@ -34,7 +34,6 @@ ACTION_SPECS = (
     ActionSpec("action-replace", "diagnostics", "编辑", "替换", "替换", "Ctrl+H", toolbar=False),
     ActionSpec("action-toggle-theme", "theme", "查看", "切换主题", "切换深浅主题"),
     ActionSpec("action-toggle-issues", "issues", "查看", "问题面板", "展开或收起问题报告"),
-    ActionSpec("action-toggle-inspector", "inspect", "查看", "属性面板", "展开或收起属性面板"),
     ActionSpec("action-validate", "validate", "查看", "校验", "校验当前项目"),
     ActionSpec("action-reset-layout", "diagnostics", "查看", "重置布局", "重置布局", toolbar=False),
     ActionSpec("action-fullscreen", "diagnostics", "窗口", "全屏", "切换全屏", toolbar=False),
