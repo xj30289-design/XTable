@@ -418,20 +418,20 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 
 - 来源：Phase 2 首批开发质量审查。
 - 范围：`Table`、`Field`、`Enum`、`Meta`、`ProjectSchema`、字段/表格类型注册表、结构一致性校验和测试覆盖。
-- 当前状态：已完成开发修复，等待复验。
-- 当前会话角色：开发角色。当前会话负责按第八批次修改建议补齐模型结构校验和回归测试。
+- 当前状态：已复验通过并关闭。
+- 当前会话角色：测试角色。当前会话负责同步最新本地状态、复验第八批次修复结果并评估 Phase 2 完成度。
 - 验证结果：`python -m pytest` 通过，66 项测试全部通过；`python -m compileall -q src tests` 通过；额外结构探针测试暴露 6 类非法模型可被注册的问题。
 - 总体结论：Phase 2 当前是“核心数据模型骨架可用”，但不能按“核心数据模型完成”验收。主要风险是 `ProjectSchema` 可以进入非法结构状态，后续 Phase 3/4 会被迫处理脏模型。
 
 | ID | 阶段 | 级别 | 问题 | 原因分析 | 影响 | 完整修改建议 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| B8-001 | Phase 2 | P1 | `ProjectSchema.add_table()` 不校验字段引用目标是否存在。 | 当前只检查重复 `table_id` 和表内字段唯一性；`ENUM` 字段可以引用不存在的 `enum_id`，`REFERENCE` 字段可以引用不存在的 `target_table_id/target_field_id`，`META` 字段可以引用不存在的 `meta_id`。 | 非法 schema 可以进入项目模型，直到运行期调用 `resolve_field_reference()` 或后续 UI/表格模型使用时才暴露 `KeyError`，会把结构错误推迟到 Phase 3/4。 | 在模型层增加结构级引用校验。`add_table()` 或统一 `validate_structure()` 必须检查字段类型与参数匹配：`ENUM` 必须引用已注册 Enum，`REFERENCE` 必须引用已注册 Table 和目标字段，`META` 必须引用已注册 Meta；缺失时抛出明确结构错误。 | 待复验 |
-| B8-002 | Phase 2 | P1 | 表格主键、特征键和表格类型专属参数未校验。 | `primary_key`、`feature_keys`、`GroupTableDefinition.group_key`、`MatrixTableDefinition.x_axis/y_axis/value_field` 只是字符串字段，没有确认是否属于当前表字段，也没有检查二维表三轴是否重复或为空。 | 普通表、分组表和二维表虽然能用统一模型表达，但表达结果可能无效；后续排序、引用预览、分组视图和二维表展开会缺少可信前提。 | 增加表结构校验：普通表主键/特征键必须存在于字段列表；分组表 `group_key` 必须存在；二维表 `x_axis/y_axis/value_field` 必须存在且语义不冲突；对表格类型注册表中的 `required_parameters` 建立自动校验或显式校验方法。 | 待复验 |
-| B8-003 | Phase 2 | P1 | Enum 结构规则未完整落地。 | `add_enum()` 只检查重复 `enum_id` 和重复 `item_id`，没有检查重复 `export_value`、`default_item_id` 是否存在、默认项是否废弃。 | 与枚举规格不一致；导出值重复会导致运行时配置歧义，默认项不存在会导致新增行默认值无法稳定生成。 | `add_enum()` 或 `EnumDefinition.validate()` 增加：`export_value` 默认不得重复；`default_item_id` 非空时必须存在；默认项不得为 deprecated；错误信息需要包含 enum_id 和冲突项，方便 UI 定位。 | 待复验 |
-| B8-004 | Phase 2 | P1 | Meta 子字段重复名称未校验。 | `add_meta()` 只检查重复 `field_id`，未检查重复 `name`；Table 字段有 `field_names` 唯一检查，但 Meta 未复用同等规则。 | 违反 Meta 子字段与 Table 字段复用同一字段定义能力的规格；导出、复制粘贴和属性面板按字段名访问时会出现歧义。 | 抽出通用字段集合校验函数，同时用于 Table 和 Meta：校验 `field_id`、`name` 唯一，并为 Meta 子字段复用字段类型参数校验。 | 待复验 |
-| B8-005 | Phase 2 | P2 | `TableRow` 没有结构约束，非法行数据可进入模型。 | `TableRow.values` 是自由 `dict[str, Any]`，`add_table()` 不检查未知字段、缺少必填字段、明显类型不匹配或只读字段写入来源。 | Phase 2 虽不负责完整业务校验，但核心数据模型无法保证行数据至少匹配表结构；后续编辑、保存、导入导出会面对不可信数据。 | 明确 Phase 2 与 Phase 4 边界：Phase 2 至少提供行结构校验入口，检查未知字段、字段名/字段 id 映射、必填字段缺失和基础类型大类；Phase 4 再负责复杂规则、范围、唯一性、Json 内容等诊断报告。 | 待复验 |
-| B8-006 | Phase 2 | P2 | 字段类型参数缺少按类型的契约校验。 | `FieldDefinition` 同时承载 `enum_id`、`target_table_id`、`target_field_id`、`element_type`、`meta_id` 等参数，但没有根据 `field_type` 判断哪些必填、哪些禁止或哪些组合有效。 | 字段定义会出现“类型是 list 但没有 element_type”“类型是 enum 但 enum_id 为空”“基础类型却携带引用参数”等不一致状态，增加 UI 和导入导出分支复杂度。 | 增加 `FieldDefinition.validate_shape()` 或注册表驱动的字段参数校验：基础类型不应携带引用参数；Enum/Reference/List/Meta 必须具备对应参数；Json 字段保留 Json 规则参数扩展点。 | 待复验 |
-| B8-007 | Phase 2 | P2 | 测试覆盖偏 happy path，不能证明模型层结构质量。 | `tests/test_phase2_domain_models.py` 主要验证可注册、可解析、重复 ID 拒绝和 Qt 隔离；缺少非法引用、非法表参数、Enum 导出值重复、Meta 字段名重复、行结构错误等失败用例。 | 自动化测试通过容易被误解为 Phase 2 可验收；实际模型层仍能接受多类非法结构。 | 将本批次探针场景加入回归测试：缺失 Enum/Meta/Table 引用、缺失主键/分组键/二维轴字段、重复 `export_value`、默认枚举项不存在、Meta 字段名重复、未知行字段和必填缺失。 | 待复验 |
+| B8-001 | Phase 2 | P1 | `ProjectSchema.add_table()` 不校验字段引用目标是否存在。 | 当前只检查重复 `table_id` 和表内字段唯一性；`ENUM` 字段可以引用不存在的 `enum_id`，`REFERENCE` 字段可以引用不存在的 `target_table_id/target_field_id`，`META` 字段可以引用不存在的 `meta_id`。 | 非法 schema 可以进入项目模型，直到运行期调用 `resolve_field_reference()` 或后续 UI/表格模型使用时才暴露 `KeyError`，会把结构错误推迟到 Phase 3/4。 | 在模型层增加结构级引用校验。`add_table()` 或统一 `validate_structure()` 必须检查字段类型与参数匹配：`ENUM` 必须引用已注册 Enum，`REFERENCE` 必须引用已注册 Table 和目标字段，`META` 必须引用已注册 Meta；缺失时抛出明确结构错误。 | 已关闭 |
+| B8-002 | Phase 2 | P1 | 表格主键、特征键和表格类型专属参数未校验。 | `primary_key`、`feature_keys`、`GroupTableDefinition.group_key`、`MatrixTableDefinition.x_axis/y_axis/value_field` 只是字符串字段，没有确认是否属于当前表字段，也没有检查二维表三轴是否重复或为空。 | 普通表、分组表和二维表虽然能用统一模型表达，但表达结果可能无效；后续排序、引用预览、分组视图和二维表展开会缺少可信前提。 | 增加表结构校验：普通表主键/特征键必须存在于字段列表；分组表 `group_key` 必须存在；二维表 `x_axis/y_axis/value_field` 必须存在且语义不冲突；对表格类型注册表中的 `required_parameters` 建立自动校验或显式校验方法。 | 已关闭 |
+| B8-003 | Phase 2 | P1 | Enum 结构规则未完整落地。 | `add_enum()` 只检查重复 `enum_id` 和重复 `item_id`，没有检查重复 `export_value`、`default_item_id` 是否存在、默认项是否废弃。 | 与枚举规格不一致；导出值重复会导致运行时配置歧义，默认项不存在会导致新增行默认值无法稳定生成。 | `add_enum()` 或 `EnumDefinition.validate()` 增加：`export_value` 默认不得重复；`default_item_id` 非空时必须存在；默认项不得为 deprecated；错误信息需要包含 enum_id 和冲突项，方便 UI 定位。 | 已关闭 |
+| B8-004 | Phase 2 | P1 | Meta 子字段重复名称未校验。 | `add_meta()` 只检查重复 `field_id`，未检查重复 `name`；Table 字段有 `field_names` 唯一检查，但 Meta 未复用同等规则。 | 违反 Meta 子字段与 Table 字段复用同一字段定义能力的规格；导出、复制粘贴和属性面板按字段名访问时会出现歧义。 | 抽出通用字段集合校验函数，同时用于 Table 和 Meta：校验 `field_id`、`name` 唯一，并为 Meta 子字段复用字段类型参数校验。 | 已关闭 |
+| B8-005 | Phase 2 | P2 | `TableRow` 没有结构约束，非法行数据可进入模型。 | `TableRow.values` 是自由 `dict[str, Any]`，`add_table()` 不检查未知字段、缺少必填字段、明显类型不匹配或只读字段写入来源。 | Phase 2 虽不负责完整业务校验，但核心数据模型无法保证行数据至少匹配表结构；后续编辑、保存、导入导出会面对不可信数据。 | 明确 Phase 2 与 Phase 4 边界：Phase 2 至少提供行结构校验入口，检查未知字段、字段名/字段 id 映射、必填字段缺失和基础类型大类；Phase 4 再负责复杂规则、范围、唯一性、Json 内容等诊断报告。 | 已关闭 |
+| B8-006 | Phase 2 | P2 | 字段类型参数缺少按类型的契约校验。 | `FieldDefinition` 同时承载 `enum_id`、`target_table_id`、`target_field_id`、`element_type`、`meta_id` 等参数，但没有根据 `field_type` 判断哪些必填、哪些禁止或哪些组合有效。 | 字段定义会出现“类型是 list 但没有 element_type”“类型是 enum 但 enum_id 为空”“基础类型却携带引用参数”等不一致状态，增加 UI 和导入导出分支复杂度。 | 增加 `FieldDefinition.validate_shape()` 或注册表驱动的字段参数校验：基础类型不应携带引用参数；Enum/Reference/List/Meta 必须具备对应参数；Json 字段保留 Json 规则参数扩展点。 | 已关闭 |
+| B8-007 | Phase 2 | P2 | 测试覆盖偏 happy path，不能证明模型层结构质量。 | `tests/test_phase2_domain_models.py` 主要验证可注册、可解析、重复 ID 拒绝和 Qt 隔离；缺少非法引用、非法表参数、Enum 导出值重复、Meta 字段名重复、行结构错误等失败用例。 | 自动化测试通过容易被误解为 Phase 2 可验收；实际模型层仍能接受多类非法结构。 | 将本批次探针场景加入回归测试：缺失 Enum/Meta/Table 引用、缺失主键/分组键/二维轴字段、重复 `export_value`、默认枚举项不存在、Meta 字段名重复、未知行字段和必填缺失。 | 已关闭 |
 
 #### 6.10.1 第八批次修复记录
 
@@ -443,3 +443,11 @@ Phase 1 已实现项目创建、打开、保存、最近项目记录，以及外
 - 行结构：`add_table()` 已校验未知行字段、必填字段缺失和基础类型大类错误；复杂范围、唯一性、Json 内容等仍保留给 Phase 4 诊断规则。
 - 字段契约：新增 `FieldDefinition.validate_shape()`，按 `field_type` 校验 enum/reference/list/meta 必需参数，并禁止基础类型携带引用参数。
 - 回归测试：`tests/test_phase2_domain_models.py` 已增加第八批探针场景，覆盖非法引用、非法表参数、Enum/Meta 结构、行结构和字段参数错配。
+
+#### 6.10.2 第八批次复验记录
+
+- 复验时间：2026-06-02。
+- 复验对象：本地 `master` 的回滚基线 `c6223e2`，该基线比 `origin/master` 多 1 个回滚提交，已移除 2026-05-26 09:00 之后的 schema 持久化、table engine、Phase 3 工作台和验收探针。
+- 复验方式：Git 同步状态检查、代码结构检查、全量自动化测试和 Phase 2 目标用例复验。
+- 自动化结果：`python -m compileall -q src tests` 通过；`python -m pytest -q` 通过，72 项测试全部通过；`python -m pytest tests\test_phase2_domain_models.py tests\test_project_files.py tests\test_ui_interactions.py::test_preview_table_supports_clipboard_copy_paste_shortcuts -v` 通过，25 项测试全部通过。
+- 复验结论：第八批次 `B8-001` 至 `B8-007` 已复验通过并关闭。当前 Phase 2 可确认完成“核心数据模型结构校验”部分，但不能视为 Phase 2 整体完成；当前本地基线缺少 schema 持久化、真实表格引擎/工作台、导入导出衔接、异常检测系统接入和日志系统接入。
